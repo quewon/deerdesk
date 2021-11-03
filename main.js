@@ -155,7 +155,7 @@ function draw() {
 
 	let x = HALF_PHONE_WIDTH;
 	let y = 300;
-	let hour = DATE.getHours() > 12 ? DATE.getHours() - 12 : DATE.getHour();
+	let hour = DATE.getHours() > 12 ? DATE.getHours() - 12 : DATE.getHours();
 	let minute = DATE.getMinutes() < 10 ? "0"+DATE.getMinutes() : DATE.getMinutes();
 	_phone.font = '200px Futura';
 	_phone.fillStyle = BLACK_HEX;
