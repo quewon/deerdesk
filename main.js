@@ -1,9 +1,12 @@
 var HALF_PI = Math.PI / 2;
 var HALF_PHONE_WIDTH;
 var DATE = new Date();
+var BLACK = 0x283954;
+var BLACK_HEX = "#283954";
 
 var _width, _height;
-var _renderer, _camera, _scene, _raycaster;
+var _renderer, _camera, _raycaster;
+var _scene = new THREE.Scene();
 var _controls = {
 	touch: false,
 	pos: new THREE.Vector2(),
@@ -16,10 +19,10 @@ var _controls = {
 				let offsetX = _controls.offset.x * 0.05;
 				let offsetY = _controls.offset.y * 0.05;
 
-				_scene.rotation.y += offsetX;
-				_scene.rotation.x += offsetY;
+				_current_scene.rotation.y += offsetX;
+				_current_scene.rotation.x += offsetY;
 
-				_scene.rotation.x = cap(_scene.rotation.x, -HALF_PI, HALF_PI);
+				_current_scene.rotation.x = cap(_current_scene.rotation.x, -HALF_PI, HALF_PI);
 
 				_controls.offset.x -= offsetX;
 				_controls.offset.y -= offsetY;
@@ -27,9 +30,10 @@ var _controls = {
 		}
 	}
 };
+var _current_scene = null;
 
 var _phone = document.getElementById("phone_screen").getContext("2d");
-var _phone_screen;
+var _phone_screen = new THREE.CanvasTexture(_phone.canvas);
 
 const roundedRectShape = new THREE.Shape();
 ( function roundedRect( ctx, x, y, width, height, radius ) {
@@ -100,8 +104,6 @@ function init_3d() {
 	_camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 	_camera.position.z = 2;
 
-	_scene = new THREE.Scene();
-
 	_raycaster = new THREE.Raycaster();
 
 	// controls
@@ -115,6 +117,9 @@ function init_3d() {
 	document.addEventListener("mouseup", function(e) {
 		_controls.select(e);
 	});
+	document.addEventListener("blur", function(e) {
+		_controls.select(e);
+	});
 
 	//
 
@@ -122,138 +127,19 @@ function init_3d() {
 	_phone.canvas.height = 1000 * 1.5 * 0.9;
 	HALF_PHONE_WIDTH = _phone.canvas.width/2;
 	_phone.textAlign = "center";
-	_phone_screen = new THREE.CanvasTexture(_phone.canvas);
 
-	const phonecase = new THREE.Mesh(
-		new THREE.ExtrudeGeometry(roundedRectShape, {
-			steps: 1,
-			depth: 0.25,
-			bevelEnabled: false,
-			bevelThickness: 1,
-			bevelSize: 1,
-			bevelOffset: 0,
-			bevelSegments: 1
-		}),
-		new THREE.MeshPhongMaterial({
-			color: 0xf2c46f,
-			shininess: 50,
-			specular: 0x050505,
-		})
-	);
-	phonecase.position.x -= 0.5;
-	phonecase.position.z -= 0.125;
-	phonecase.position.y -= 0.75;
-	const phonebutton = new THREE.Mesh(
-		new THREE.ExtrudeGeometry(roundedRectShape, {
-			steps: 1,
-			depth: 0.05,
-			bevelEnabled: false,
-			bevelThickness: 1,
-			bevelSize: 1,
-			bevelOffset: 0,
-			bevelSegments: 1
-		}),
-		new THREE.MeshPhongMaterial({
-			color: 0xf2c46f,
-			shininess: 50,
-			specular: 0x050505,
-		})
-	);
-	phonebutton.scale.set(0.1, 0.1, 0.5);
-	phonebutton.rotation.y += HALF_PI;
-	phonebutton.position.x += 0.5;
-	phonebutton.position.z += 0.0375;
-	phonebutton.position.y += 0.25;
-	const phonescreen = new THREE.Mesh(
-		new THREE.PlaneGeometry(0.75, 1.25),
-		// new THREE.ShapeGeometry(roundedRectShape),
-		new THREE.MeshPhongMaterial({
-			map: _phone_screen,
-			shininess: 150,
-			roughness: 0,
-			emissive: 0x1f401e,
-			metalness: .9,
-			reflectivity: 0.2,
-			refractionRatio: 0.985,
-			ior: 0.9,
-			specular: 0x050505,
-		})
-	);
-	// phonescreen.scale.set(0.9, 0.9, 0.9);
-	// phonescreen.position.x -= 0.45;
-	// phonescreen.position.y -= 0.69;
-	phonescreen.position.z += 0.1365;
-	const phonebevel = new THREE.Mesh(
-		new THREE.ExtrudeGeometry(roundedRectShape, {
-			steps: 1,
-			depth: 0.025,
-			bevelEnabled: false,
-			bevelThickness: 1,
-			bevelSize: 1,
-			bevelOffset: 0,
-			bevelSegments: 1
-		}),
-		new THREE.MeshPhongMaterial({
-			color: 0x283954,
-			shininess: 150,
-			roughness: 0,
-			metalness: .9,
-			reflectivity: 0.2,
-			refractionRatio: 0.985,
-			ior: 0.9,
-			specular: 0x050505,
-		})
-	);
-	phonebevel.scale.set(0.95, 0.95, 0.95);
-	phonebevel.position.x -= 0.475;
-	phonebevel.position.y -= 0.725;
-	phonebevel.position.z += 0.1125;
-	const phonecamera = new THREE.Mesh(
-		new THREE.CylinderGeometry(0.05, 0.05, 0.016, 24),
-		new THREE.MeshPhongMaterial({
-			color: 0x283954,
-			shininess: 150,
-			roughness: 0,
-			metalness: .9,
-			reflectivity: 0.2,
-			refractionRatio: 0.985,
-			ior: 0.9,
-			specular: 0x050505,
-		})
-	);
-	phonecamera.rotation.x += HALF_PI;
-	phonecamera.position.y += 0.625;
-	phonecamera.position.z -= 0.125;
-	const phoneflash = new THREE.Mesh(
-		new THREE.CylinderGeometry(0.025, 0.025, 0.015, 12),
-		new THREE.MeshPhongMaterial({
-			color: 0xf0eddd,
-			// emissive: 0xf0eddd,
-			shininess: 150,
-			roughness: 0,
-			metalness: .9,
-			reflectivity: 0.2,
-			refractionRatio: 0.985,
-			ior: 0.9,
-			specular: 0x050505,
-		})
-	);
-	phoneflash.rotation.x += HALF_PI;
-	phoneflash.position.y += 0.525;
-	phoneflash.position.z -= 0.125;
-	_scene.add(phonebevel);
-	_scene.add(phonescreen);
-	_scene.add(phonecase);
-	_scene.add(phonebutton);
-	_scene.add(phonecamera);
-	_scene.add(phoneflash);
+	//
 
-	_scene.add( new THREE.AmbientLight( 0xffffff, 0.9 ) );
+	_scene.add(new THREE.AmbientLight(0xffffff, 0.9));
 
-	const lighting = new THREE.DirectionalLight( 0xf2c46f, 1 );
-	lighting.position.x = -1;
-	lighting.position.z = 1;
-	_scene.add( lighting );
+	const light1 = new THREE.DirectionalLight(0xf2c46f, 0.75);
+	light1.position.x = -1;
+	light1.position.z = 1;
+	const light2 = new THREE.DirectionalLight(0xf2c46f, 0.1);
+	light2.position.x = 1;
+	// light2.position.z = -1;
+	_scene.add( light1 );
+	_scene.add( light2 );
 
 	draw();
 }
@@ -272,7 +158,7 @@ function draw() {
 	let hour = DATE.getHours() > 12 ? DATE.getHours() - 12 : DATE.getHour();
 	let minute = DATE.getMinutes() < 10 ? "0"+DATE.getMinutes() : DATE.getMinutes();
 	_phone.font = '200px Futura';
-	_phone.fillStyle = "#000";
+	_phone.fillStyle = BLACK_HEX;
   	_phone.fillText(hour+":"+minute, x, y);
   	_phone.font = '75px Futura';
   	_phone.fillText(DATE.getFullYear()+"/"+DATE.getMonth()+"/"+DATE.getDate(), x, y+100);
@@ -308,10 +194,10 @@ _controls.move = function(e) {
 			(_controls.pos.y - _controls.prevPos.y) * _controls.speed
 		);
 
-		_scene.rotation.y += _controls.offset.x;
-		_scene.rotation.x += _controls.offset.y;
+		_current_scene.rotation.y += _controls.offset.x;
+		_current_scene.rotation.x += _controls.offset.y;
 
-		_scene.rotation.x = cap(_scene.rotation.x, -HALF_PI, HALF_PI);
+		_current_scene.rotation.x = cap(_current_scene.rotation.x, -HALF_PI, HALF_PI);
 	}
 
 	// move action
@@ -348,7 +234,3 @@ function getMousePosition( dom, x, y ) {
 }
 
 window.onresize = getSize;
-
-window.onload = function() {
-	init();
-};
