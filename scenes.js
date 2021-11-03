@@ -1,6 +1,5 @@
 var assets = {
 	images: {
-		"deer": "images/deer.png",
 		"forest": "images/forest.png",
 	},
 	sounds: {
