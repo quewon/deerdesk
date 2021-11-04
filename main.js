@@ -12,7 +12,8 @@ var _controls = {
 	pos: new THREE.Vector2(),
 	prevPos: null,
 	offset: new THREE.Vector2(),
-	speed: 5,
+	speedFactor: 2.5,
+	speed: 3,
 	update: function() {
 		if (_controls.offset) {
 			if (_controls.offset.x > 0 || _controls.offset.y > 0) {
@@ -269,6 +270,8 @@ function getSize() {
 		_height = width/16*9;
 		_width = width;
 	}
+
+	_controls.speed = _controls.speedFactor * _width / 1000;
 
 	_renderer.setSize( _width, _height );
 }
