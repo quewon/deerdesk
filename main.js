@@ -115,10 +115,12 @@ function init_3d() {
 		_controls.move(e);
 	});
 	document.addEventListener("touchstart", function(e) {
+		e.preventDefault();
 		_controls.touch = true;
 		_controls.move(e);
 	});
 	document.addEventListener("touchmove", function(e) {
+		e.preventDefault();
 		_controls.move(e);
 	})
 	document.addEventListener("mouseup", function(e) {
@@ -257,8 +259,8 @@ function cap(value, min, max) {
 }
 
 function getSize() {
-	let height = window.innerHeight;
-	let width = window.innerWidth;
+	let height = document.documentElement.clientHeight;
+	let width = document.documentElement.clientWidth;
 
 	if (height <= width) {
 		_height = height;
