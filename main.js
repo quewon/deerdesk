@@ -10,7 +10,7 @@ var _scene = new THREE.Scene();
 var _controls = {
 	touch: false,
 	pos: new THREE.Vector2(),
-	prevPos: new THREE.Vector2(),
+	prevPos: null,
 	offset: new THREE.Vector2(),
 	speed: 5,
 	update: function() {
@@ -88,11 +88,11 @@ function init() {
 }
 
 function init_3d() {
-	getSize();
-
 	_renderer = new THREE.WebGLRenderer({ alpha: true });
 	// _renderer.setClearColor( 0x000000, 0 );
-	_renderer.setSize( _width, _height );
+
+	getSize();
+
 	_renderer.domElement.classList.add("centered");
 	_renderer.setPixelRatio(window.devicePixelRatio * 1.25);
 	document.body.appendChild( _renderer.domElement );
@@ -114,12 +114,26 @@ function init_3d() {
 	document.addEventListener("mousemove", function(e) {
 		_controls.move(e);
 	});
+	document.addEventListener("touchstart", function(e) {
+		_controls.touch = true;
+		_controls.move(e);
+	});
+	document.addEventListener("touchmove", function(e) {
+		_controls.move(e);
+	})
 	document.addEventListener("mouseup", function(e) {
+		_controls.select(e);
+	});
+	document.addEventListener("touchend", function(e) {
+		_controls.select(e);
+	});
+	document.addEventListener("touchcancel", function(e) {
 		_controls.select(e);
 	});
 	document.addEventListener("blur", function(e) {
 		_controls.select(e);
 	});
+	window.addEventListener("resize", getSize);
 
 	//
 
@@ -148,8 +162,9 @@ function draw() {
 	DATE = new Date();
 
 	// draw phone screen
-	// _phone.fillStyle = "#00ff00";
-	// _phone.fillRect(0, 0, _phone.canvas.width, _phone.canvas.height);
+
+	_phone.fillStyle = "#fff";
+	_phone.fillRect(0, 0, _phone.canvas.width, _phone.canvas.height);
 
 	_phone.drawImage(assets.images.forest, 0, 0);
 
@@ -181,10 +196,27 @@ function draw() {
 }
 
 _controls.move = function(e) {
-	_controls.prevPos.set(_controls.pos.x, _controls.pos.y);
+	let x, y;
+	if (e.touches) {
+		let touch = e.touches[0] || e.changedTouches[0] || null;
+		x = touch.pageX;
+		y = touch.pageY;
+	} else {
+		x = e.pageX;
+		y = e.pageY;
+	}
+
+	if (!_controls.prevPos) {
+		_controls.prevPos = new THREE.Vector2(
+			(x / _width) * 2 - 1,
+			(y / _height) * 2 + 1
+		);
+	} else {
+		_controls.prevPos.set(_controls.pos.x, _controls.pos.y);
+	}
 	_controls.pos.set(
-		( event.pageX / _width ) * 2 - 1,
-		( event.pageY / _height ) * 2 + 1
+		(x / _width) * 2 - 1,
+		(y / _height) * 2 + 1
 	);
 
 	// hold and drag action
@@ -209,6 +241,7 @@ _controls.select = function(e) { // mouseup
 
 	// reset
 	_controls.touch = false;
+	_controls.prevPos = null;
 }
 
 function cap(value, min, max) {
@@ -224,13 +257,21 @@ function cap(value, min, max) {
 }
 
 function getSize() {
-	_height = window.innerHeight;
-	_width = _height/9*16;
+	let height = window.innerHeight;
+	let width = window.innerWidth;
+
+	if (height <= width) {
+		_height = height;
+		_width = height/9*16;
+	} else {
+		_height = width/16*9;
+		_width = width;
+	}
+
+	_renderer.setSize( _width, _height );
 }
 
 function getMousePosition( dom, x, y ) {
 	const rect = dom.getBoundingClientRect();
 	return [ ( x - rect.left ) / rect.width, ( y - rect.top ) / rect.height ];
 }
-
-window.onresize = getSize;

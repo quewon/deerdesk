@@ -82,7 +82,7 @@ var phone = new scene({
 		phonebutton.scale.set(0.1, 0.1, 0.5);
 		phonebutton.rotation.y += HALF_PI;
 		phonebutton.position.x += 0.5;
-		phonebutton.position.z += 0.0375;
+		phonebutton.position.z += 0.045;
 		phonebutton.position.y += 0.25;
 		const phonescreen = new THREE.Mesh(
 			new THREE.PlaneGeometry(0.75, 1.25),
