@@ -12,8 +12,8 @@ var _controls = {
 	pos: new THREE.Vector2(),
 	prevPos: null,
 	offset: new THREE.Vector2(),
-	speedFactor: 2.5,
-	speed: 3,
+	speedFactor: 3.5,
+	speed: undefined,
 	update: function() {
 		if (_controls.offset) {
 			if (_controls.offset.x > 0 || _controls.offset.y > 0) {
@@ -21,7 +21,7 @@ var _controls = {
 				let offsetY = _controls.offset.y * 0.05;
 
 				_current_scene.rotation.y += offsetX;
-				_current_scene.rotation.x += offsetY;
+				_current_scene.rotation.x -= offsetY;
 
 				_current_scene.rotation.x = cap(_current_scene.rotation.x, -HALF_PI, HALF_PI);
 
@@ -34,6 +34,7 @@ var _controls = {
 var _current_scene = null;
 
 var _phone = document.getElementById("phone_screen").getContext("2d");
+_phone.cursor = null;
 var _phone_screen = new THREE.CanvasTexture(_phone.canvas);
 
 const roundedRectShape = new THREE.Shape();
@@ -181,6 +182,13 @@ function draw() {
   	_phone.font = '75px Futura';
   	_phone.fillText(DATE.getFullYear()+"/"+DATE.getMonth()+"/"+DATE.getDate(), x, y+100);
 
+  	if (_phone.cursor) {
+  		x = _phone.cursor.x;
+		y = _phone.cursor.y;
+		_phone.fillStyle = "#ff0000";
+		_phone.fillRect(x*_phone.canvas.width, y*_phone.canvas.height, 30, 30);
+  	}
+  	
 	_controls.update();
 
 	// _raycaster.setFromCamera(new THREE.Vector2(), _camera);
@@ -200,6 +208,7 @@ function draw() {
 
 _controls.move = function(e) {
 	let x, y;
+
 	if (e.touches) {
 		let touch = e.touches[0] || e.changedTouches[0] || null;
 		x = touch.pageX;
@@ -208,19 +217,29 @@ _controls.move = function(e) {
 		x = e.pageX;
 		y = e.pageY;
 	}
+	let pos = normalizedMousePosition(x, y);
 
 	if (!_controls.prevPos) {
-		_controls.prevPos = new THREE.Vector2(
-			(x / _width) * 2 - 1,
-			(y / _height) * 2 + 1
-		);
+		_controls.prevPos = new THREE.Vector2(pos.x, pos.y);
 	} else {
 		_controls.prevPos.set(_controls.pos.x, _controls.pos.y);
 	}
-	_controls.pos.set(
-		(x / _width) * 2 - 1,
-		(y / _height) * 2 + 1
-	);
+	_controls.pos.set(pos.x, pos.y);
+
+	_raycaster.setFromCamera(_controls.pos, _camera);
+	const intersects = _raycaster.intersectObjects(_current_scene.children, false);
+
+	if (intersects.length > 0 && intersects[0].object.material.map) {
+		const uv = intersects[0].uv;
+		intersects[0].object.material.map.transformUv(uv);
+		if (!_phone.cursor) {
+			_phone.cursor = new THREE.Vector2(uv.x, uv.y)
+		} else {
+			_phone.cursor.set(uv.x, uv.y);
+		}
+	} else {
+		_phone.cursor = null;
+	}
 
 	// hold and drag action
 	if (_controls.touch) {
@@ -230,13 +249,22 @@ _controls.move = function(e) {
 		);
 
 		_current_scene.rotation.y += _controls.offset.x;
-		_current_scene.rotation.x += _controls.offset.y;
+		_current_scene.rotation.x -= _controls.offset.y;
 
 		_current_scene.rotation.x = cap(_current_scene.rotation.x, -HALF_PI, HALF_PI);
 	}
 
 	// move action
 
+}
+
+function normalizedMousePosition(x, y) {
+	const rect = _renderer.domElement.getBoundingClientRect();
+
+	return {
+		x: ((x - rect.left) / rect.width * 2) - 1,
+		y: - ((y - rect.top) / rect.height * 2) + 1,
+	}
 }
 
 _controls.select = function(e) { // mouseup
@@ -266,12 +294,12 @@ function getSize() {
 	if (height <= width) {
 		_height = height;
 		_width = height/9*16;
+		_controls.speed = _controls.speedFactor * _height / 1000;
 	} else {
 		_height = width/16*9;
 		_width = width;
+		_controls.speed = _controls.speedFactor * _width / 1000;
 	}
-
-	_controls.speed = _controls.speedFactor * _width / 1000;
 
 	_renderer.setSize( _width, _height );
 }

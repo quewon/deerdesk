@@ -35,10 +35,8 @@ class scene {
 	}
 }
 
-class object {
-	constructor(p) {
-		
-	}
+class screen {
+	
 }
 
 var phone = new scene({
@@ -82,8 +80,21 @@ var phone = new scene({
 		phonebutton.scale.set(0.1, 0.1, 0.5);
 		phonebutton.rotation.y += HALF_PI;
 		phonebutton.position.x += 0.5;
-		phonebutton.position.z += 0.045;
+		phonebutton.position.z += 0.05;
 		phonebutton.position.y += 0.25;
+		const phonebuttonhole = new THREE.Mesh(
+			new THREE.ShapeGeometry(roundedRectShape),
+			new THREE.MeshPhongMaterial({
+				color: BLACK,
+				shininess: 50,
+				specular: 0x050505,
+			})
+		);
+		phonebuttonhole.scale.set(0.1125, 0.1075, 0.5125);
+		phonebuttonhole.rotation.y += HALF_PI;
+		phonebuttonhole.position.x += 0.5001;
+		phonebuttonhole.position.z += 0.056;
+		phonebuttonhole.position.y += 0.2455;
 		const phonescreen = new THREE.Mesh(
 			new THREE.PlaneGeometry(0.75, 1.25),
 			// new THREE.ShapeGeometry(roundedRectShape),
@@ -209,13 +220,30 @@ var phone = new scene({
 		logo.rotation.z -= HALF_PI;
 		logo.position.z -= 0.12501;
 
+		const port = new THREE.Mesh(
+			new THREE.ShapeGeometry(roundedRectShape),
+			new THREE.MeshPhongMaterial({
+				color: BLACK,
+				shininess: 50,
+				specular: 0x050505,
+			})
+		);
+		port.scale.set(0.05, 0.1, 0.5);
+		port.rotation.x += HALF_PI;
+		port.rotation.z += HALF_PI;
+		port.position.x += 0.075;
+		port.position.z -= 0.0235;
+		port.position.y -= 0.75001;
+
 		group.add(phonebevel);
 		group.add(phonescreen);
 		group.add(phonecase);
+		group.add(phonebuttonhole);
 		group.add(phonebutton);
 		group.add(phonecamera_bevel);
 		group.add(phonecamera);
 		group.add(phoneflash);
+		group.add(port);
 		group.add(logo);
 	}
 });
