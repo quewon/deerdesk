@@ -19,6 +19,7 @@ class scene {
 		_scene.add(group);
 
 		this.group = group;
+		this.isPhone = p.isPhone || false;
 
 		ref.push(this);
 	}
@@ -32,11 +33,23 @@ class scene {
 		this.group.rotation.set(0, 0, 0);
 
 		_current_scene = this.group;
+
+		if (this.isPhone) {
+			
+		}
 	}
 }
 
 class screen {
-	
+	constructor(p) {
+		this.id = ref.length;
+
+		ref.push(this);
+	}
+
+	check() {
+
+	}
 }
 
 var phone = new scene({
@@ -245,7 +258,8 @@ var phone = new scene({
 		group.add(phoneflash);
 		group.add(port);
 		group.add(logo);
-	}
+	},
+	isPhone: true,
 });
 
 // var bedroom = new scene({

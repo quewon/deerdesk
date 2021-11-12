@@ -32,6 +32,7 @@ var _controls = {
 	}
 };
 var _current_scene = null;
+var _current_screen = null;
 
 var _phone = document.getElementById("phone_screen").getContext("2d");
 _phone.cursor = null;
@@ -198,7 +199,6 @@ function draw() {
 	// }
 
 	// render
-
 
 	_phone_screen.needsUpdate = true;
 	_renderer.render(_scene, _camera);
