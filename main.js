@@ -69,7 +69,10 @@ function init() {
 				
 				for (let child of group.children) {
 					if ('material' in child) {
-						child.material.map = texture;
+						if (child.material.emissive.g == 0) {
+							child.material.map = texture;
+							child.material.metalness = 0;
+						}
 					}
 					imgs[child.name] = child;
 				}
@@ -102,19 +105,20 @@ function init_3d() {
 
 	_renderer.outputEncoding = THREE.sRGBEncoding;
 	_renderer.domElement.classList.add("centered");
-	_renderer.setPixelRatio(window.devicePixelRatio * 1.25);
+	_renderer.setPixelRatio(window.devicePixelRatio * 2);
 	document.body.appendChild( _renderer.domElement );
 
 	_raycaster = new THREE.Raycaster();
 	
 	//
 	
-	const light1 = new THREE.DirectionalLight(0xf2c46f, 1.75);
+	const light1 = new THREE.DirectionalLight(0xf2c46f, 0.75);
 	light1.position.x = -1;
 	light1.position.z = 1;
-	const light2 = new THREE.DirectionalLight(0xf2c46f, 1.1);
+	const light2 = new THREE.DirectionalLight(0xf2c46f, 0.1);
 	light2.position.x = 1;
 	light2.position.z = 1;
+	_scene.add(new THREE.AmbientLight(0xf2c46f, 0.5));
 	_scene.add(light1);
 	_scene.add(light2);
 
@@ -127,12 +131,10 @@ function init_3d() {
 		_controls.move(e);
 	});
 	document.addEventListener("touchstart", function(e) {
-		e.preventDefault();
 		_controls.touch = true;
 		_controls.move(e);
 	});
 	document.addEventListener("touchmove", function(e) {
-		e.preventDefault();
 		_controls.move(e);
 	})
 	document.addEventListener("mouseup", function(e) {
