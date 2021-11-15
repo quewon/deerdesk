@@ -1,11 +1,14 @@
+import {GLTFLoader} from "./lib/GLTFLoader.js";
+
 var HALF_PI = Math.PI / 2;
-var HALF_PHONE_WIDTH;
 var DATE = new Date();
 var BLACK = 0x283954;
 var BLACK_HEX = "#283954";
 
 var _width, _height;
 var _renderer, _camera, _raycaster;
+var _loader = new GLTFLoader();
+var _texture_loader = new THREE.TextureLoader();
 var _scene = new THREE.Scene();
 var _controls = {
 	touch: false,
@@ -21,9 +24,9 @@ var _controls = {
 				let offsetY = _controls.offset.y * 0.05;
 
 				_current_scene.rotation.y += offsetX;
-				_current_scene.rotation.x -= offsetY;
+				// _current_scene.rotation.x -= offsetY;
 
-				_current_scene.rotation.x = cap(_current_scene.rotation.x, -HALF_PI, HALF_PI);
+				// _current_scene.rotation.x = cap(_current_scene.rotation.x, -HALF_PI, HALF_PI);
 
 				_controls.offset.x -= offsetX;
 				_controls.offset.y -= offsetY;
@@ -32,24 +35,6 @@ var _controls = {
 	}
 };
 var _current_scene = null;
-var _current_screen = null;
-
-var _phone = document.getElementById("phone_screen").getContext("2d");
-_phone.cursor = null;
-var _phone_screen = new THREE.CanvasTexture(_phone.canvas);
-
-const roundedRectShape = new THREE.Shape();
-( function roundedRect( ctx, x, y, width, height, radius ) {
-	ctx.moveTo( x, y + radius );
-	ctx.lineTo( x, y + height - radius );
-	ctx.quadraticCurveTo( x, y + height, x + radius, y + height );
-	ctx.lineTo( x + width - radius, y + height );
-	ctx.quadraticCurveTo( x + width, y + height, x + width, y + height - radius );
-	ctx.lineTo( x + width, y + radius );
-	ctx.quadraticCurveTo( x + width, y, x + width - radius, y );
-	ctx.lineTo( x + radius, y );
-	ctx.quadraticCurveTo( x, y, x, y + radius );
-} )( roundedRectShape, 0, 0, 1, 1.5, 0.15 );
 
 function init() {
 	// load assets
@@ -72,42 +57,66 @@ function init() {
 	function loadimgs() {
 		var imgs = {};
 		let imgcounter = 0;
+		
+		const texture = _texture_loader.load("images/palette.png");
+		texture.encoding = THREE.sRGBEncoding;
+		texture.flipY = false;
+		
 		for (const name in assets.images) {
-			let filename = assets.images[name];
-			imgs[name] = document.createElement("img");
-			imgs[name].src = filename;
 			imgcounter++;
-
-			imgs[name].onload = function() {
+			_loader.load(assets.images[name], function(gltf) {
+				const group = gltf.scene;
+				
+				for (let child of group.children) {
+					if ('material' in child) {
+						child.material.map = texture;
+					}
+					imgs[child.name] = child;
+				}
+				
 				imgcounter--;
 				if (imgcounter == 0) {
+					assets.images = imgs;
 					console.log("all images loaded.");
 					init_3d();
 				}
-			}
+			});
 		}
-		assets.images = imgs;
 	}
 }
 
 function init_3d() {
 	_renderer = new THREE.WebGLRenderer({ alpha: true });
 	// _renderer.setClearColor( 0x000000, 0 );
+	
+	const fov = 75;
+	const aspect = 2;
+	const near = 1;
+	const far = 500;
+	_camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+	_camera.position.set(10, 10, 25);
+	_camera.lookAt(0, 0, 0);
+	_camera.position.y += 3;
 
 	getSize();
 
+	_renderer.outputEncoding = THREE.sRGBEncoding;
 	_renderer.domElement.classList.add("centered");
 	_renderer.setPixelRatio(window.devicePixelRatio * 1.25);
 	document.body.appendChild( _renderer.domElement );
 
-	const fov = 75;
-	const aspect = 2;
-	const near = 1;
-	const far = 30;
-	_camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-	_camera.position.z = 2;
-
 	_raycaster = new THREE.Raycaster();
+	
+	//
+	
+	const light1 = new THREE.DirectionalLight(0xf2c46f, 1.75);
+	light1.position.x = -1;
+	light1.position.z = 1;
+	const light2 = new THREE.DirectionalLight(0xf2c46f, 1.1);
+	light2.position.x = 1;
+	light2.position.z = 1;
+	_scene.add(light1);
+	_scene.add(light2);
 
 	// controls
 
@@ -141,55 +150,15 @@ function init_3d() {
 	window.addEventListener("resize", getSize);
 
 	//
-
-	_phone.canvas.width = 1000 * 0.9;
-	_phone.canvas.height = 1000 * 1.5 * 0.9;
-	HALF_PHONE_WIDTH = _phone.canvas.width/2;
-	_phone.textAlign = "center";
-
-	//
-
-	_scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-
-	const light1 = new THREE.DirectionalLight(0xf2c46f, 0.75);
-	light1.position.x = -1;
-	light1.position.z = 1;
-	const light2 = new THREE.DirectionalLight(0xf2c46f, 0.1);
-	light2.position.x = 1;
-	// light2.position.z = -1;
-	_scene.add( light1 );
-	_scene.add( light2 );
-
+	
 	draw();
+	
+	init_scenes();
 }
 
 function draw() {
 	DATE = new Date();
 
-	// draw phone screen
-
-	_phone.fillStyle = "#fff";
-	_phone.fillRect(0, 0, _phone.canvas.width, _phone.canvas.height);
-
-	_phone.drawImage(assets.images.forest, 0, 0);
-
-	let x = HALF_PHONE_WIDTH;
-	let y = 300;
-	let hour = DATE.getHours() > 12 ? DATE.getHours() - 12 : DATE.getHours();
-	let minute = DATE.getMinutes() < 10 ? "0"+DATE.getMinutes() : DATE.getMinutes();
-	_phone.font = '200px Futura';
-	_phone.fillStyle = BLACK_HEX;
-  	_phone.fillText(hour+":"+minute, x, y);
-  	_phone.font = '75px Futura';
-  	_phone.fillText(DATE.getFullYear()+"/"+DATE.getMonth()+"/"+DATE.getDate(), x, y+100);
-
-  	if (_phone.cursor) {
-  		x = _phone.cursor.x;
-		y = _phone.cursor.y;
-		_phone.fillStyle = "#ff0000";
-		_phone.fillRect(x*_phone.canvas.width, y*_phone.canvas.height, 30, 30);
-  	}
-  	
 	_controls.update();
 
 	// _raycaster.setFromCamera(new THREE.Vector2(), _camera);
@@ -200,7 +169,6 @@ function draw() {
 
 	// render
 
-	_phone_screen.needsUpdate = true;
 	_renderer.render(_scene, _camera);
 
 	requestAnimationFrame(draw);
@@ -226,21 +194,6 @@ _controls.move = function(e) {
 	}
 	_controls.pos.set(pos.x, pos.y);
 
-	_raycaster.setFromCamera(_controls.pos, _camera);
-	const intersects = _raycaster.intersectObjects(_current_scene.children, false);
-
-	if (intersects.length > 0 && intersects[0].object.material.map) {
-		const uv = intersects[0].uv;
-		intersects[0].object.material.map.transformUv(uv);
-		if (!_phone.cursor) {
-			_phone.cursor = new THREE.Vector2(uv.x, uv.y)
-		} else {
-			_phone.cursor.set(uv.x, uv.y);
-		}
-	} else {
-		_phone.cursor = null;
-	}
-
 	// hold and drag action
 	if (_controls.touch) {
 		_controls.offset.set(
@@ -249,9 +202,9 @@ _controls.move = function(e) {
 		);
 
 		_current_scene.rotation.y += _controls.offset.x;
-		_current_scene.rotation.x -= _controls.offset.y;
+		// _current_scene.rotation.x -= _controls.offset.y;
 
-		_current_scene.rotation.x = cap(_current_scene.rotation.x, -HALF_PI, HALF_PI);
+		// _current_scene.rotation.x = cap(_current_scene.rotation.x, -HALF_PI, HALF_PI);
 	}
 
 	// move action
@@ -288,18 +241,21 @@ function cap(value, min, max) {
 }
 
 function getSize() {
-	let height = document.documentElement.clientHeight;
-	let width = document.documentElement.clientWidth;
+	_height = document.documentElement.clientHeight;
+	_width = document.documentElement.clientWidth;
 
-	if (height <= width) {
-		_height = height;
-		_width = height/9*16;
+	if (_height <= _width) {
+		// _height = height;
+		// _width = height;/9*16;
 		_controls.speed = _controls.speedFactor * _height / 1000;
 	} else {
-		_height = width/16*9;
-		_width = width;
+		// _height = width;/16*9;
+		// _width = width;
 		_controls.speed = _controls.speedFactor * _width / 1000;
 	}
+	
+	_camera.aspect = _width / _height;
+  _camera.updateProjectionMatrix();
 
 	_renderer.setSize( _width, _height );
 }
@@ -308,3 +264,120 @@ function getMousePosition( dom, x, y ) {
 	const rect = dom.getBoundingClientRect();
 	return [ ( x - rect.left ) / rect.width, ( y - rect.top ) / rect.height ];
 }
+
+// SCENES
+
+var ref = [];
+
+class scene {
+	constructor(p) {
+		this.id = ref.length;
+		this.objects = p.objects;
+
+		this.init = p.init;
+
+		var group = new THREE.Group();
+		group.visible = false;
+		_scene.add(group);
+		this.group = group;
+		this.neverLoaded = true;
+
+		ref.push(this);
+	}
+
+	load() {
+		if (this.neverLoaded) {
+			this.init(this.group);
+			this.neverLoaded = false;
+		}
+		
+		if (_current_scene) {
+			_current_scene.visible = false;
+		}
+
+		this.group.visible = true;
+		this.group.rotation.set(0, 0, 0);
+
+		_current_scene = this.group;
+	}
+}
+
+class screen {
+	constructor(p) {
+		this.id = ref.length;
+
+		ref.push(this);
+	}
+
+	check() {
+
+	}
+}
+
+//
+
+var assets = {
+	images: {
+		"bedroom": "images/bedroom.glb",
+	},
+	sounds: {
+		"alarm": { src: "sounds/alarm.wav", loop: true },
+	},
+};
+var bedroom = new scene({
+	music: "alarm",
+	init: function(group) {
+		const load = [
+			"floor",
+			
+			"3",
+			"6",
+			"9",
+			"12",
+			"hour_hand",
+			"minute_hand",
+			"clock_lines",
+			"clock",
+			
+			"bed",
+			
+			"phone_case",
+			"phone_screen",
+			
+			"chair",
+			"desk",
+			"keyboar",
+			"mouse",
+			
+			"computer_plug",
+			"pc",
+			"pc_screen",
+			
+			"charger",
+			"charger001",
+			"charger002",
+			"charger003",
+			
+			"window",
+			"curtain_lever",
+			
+			"deer"
+		];
+		
+		for (const obj of load) {
+			group.add(assets.images[obj]);
+		}
+		
+		group.rotation.y = -1.7521712817716457;
+	},
+});
+
+function init_scenes() {
+	bedroom.load();
+	
+	console.log("all scenes loaded.");
+}
+
+window.onload = function() {
+	init();
+};

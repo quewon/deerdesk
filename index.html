@@ -9,13 +9,15 @@
 
 		html {
 			overflow: hidden;
+			background: #384636;
 		}
 
 		body {
 			position: fixed;
-		    top: 0;
-		    left: 50%;
-		    bottom: 0;
+		  top: 0;
+		  left: 50%;
+		  bottom: 0;
+			margin: 0;
 		}
 
 		.centered {
@@ -80,19 +82,12 @@
 </head>
 <body>
 
-	<div id="bg" class="centered"></div>
-	<canvas id="phone_screen" class="hidden"></canvas>
+	<!-- <div id="bg" class="centered"></div> -->
 
 </body>
 
-<script type="text/javascript" src="lib/three.min.js"></script>
-<script type="text/javascript" src="lib/howler.js"></script>
-<script type="text/javascript" src="main.js"></script>
-<script type="text/javascript" src="scenes.js"></script>
-<script type="text/javascript">
-	window.onload = function() {
-		init();
-		phone.load();
-	};
-</script>
+<script src="lib/three.js"></script>
+<script src="lib/howler.js"></script>
+<script type="module" src="lib/GLTFLoader.js"></script>
+<script type="module" src="main.js"></script>
 </html>
