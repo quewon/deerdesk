@@ -1,15 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title></title>
+	<meta charset="utf-8">
+	<title>deerdesk</title>
 	<style type="text/css">
+		@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,700;1,700&display=swap');
+	
 		:root {
-			--bg: #acd052;
+			--bg: #384636;
+			--color: #f1e5d2;
 		}
 
 		html {
 			overflow: hidden;
-			background: #384636;
+			background: var(--bg);
+			color: var(--white);
 		}
 
 		body {
@@ -25,10 +30,15 @@
 			left: 50%;
 			top: 50%;
 			transform: translate(-50%, -50%);
+			color: var(--color);
+			text-align: center;
+			font-size: 20px;
+			min-width: 20em;
+			font-family: 'Josefin Sans', monospace;
 		}
 
 		.hidden {
-			display: none;
+			display: none !important;
 		}
 
 		#bg {
@@ -76,6 +86,9 @@
 <body>
 
 	<!-- <div id="bg" class="centered"></div> -->
+	<span id="loading" class="centered">
+		deerdesk에 오신 걸 환영합니다!
+	</span>
 
 </body>
 

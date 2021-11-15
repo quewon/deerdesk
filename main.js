@@ -1,9 +1,7 @@
 import {GLTFLoader} from "./lib/GLTFLoader.js";
 
 var HALF_PI = Math.PI / 2;
-var DATE = new Date();
-var BLACK = 0x283954;
-var BLACK_HEX = "#283954";
+var SHADOW_BIAS = -0.0002;
 
 var _width, _height;
 var _renderer, _camera, _raycaster;
@@ -23,10 +21,10 @@ var _controls = {
 				let offsetX = _controls.offset.x * 0.05;
 				let offsetY = _controls.offset.y * 0.05;
 
-				_current_scene.rotation.y += offsetX;
-				// _current_scene.rotation.x -= offsetY;
+				_current_scene.group.rotation.y += offsetX;
+				// _current_scene.group.rotation.x -= offsetY;
 
-				// _current_scene.rotation.x = cap(_current_scene.rotation.x, -HALF_PI, HALF_PI);
+				// _current_scene.group.rotation.x = cap(_current_scene.group.rotation.x, -HALF_PI, HALF_PI);
 
 				_controls.offset.x -= offsetX;
 				_controls.offset.y -= offsetY;
@@ -73,6 +71,8 @@ function init() {
 							child.material.map = texture;
 							child.material.metalness = 0;
 						}
+						child.castShadow = true;
+						child.receiveShadow = true;
 					}
 					imgs[child.name] = child;
 				}
@@ -104,6 +104,8 @@ function init_3d() {
 	getSize();
 
 	_renderer.outputEncoding = THREE.sRGBEncoding;
+	_renderer.shadowMap.enabled = true;
+	_renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 	_renderer.domElement.classList.add("centered");
 	_renderer.setPixelRatio(window.devicePixelRatio * 2);
 	document.body.appendChild( _renderer.domElement );
@@ -112,15 +114,7 @@ function init_3d() {
 	
 	//
 	
-	const light1 = new THREE.DirectionalLight(0xf2c46f, 0.75);
-	light1.position.x = -1;
-	light1.position.z = 1;
-	const light2 = new THREE.DirectionalLight(0xf2c46f, 0.1);
-	light2.position.x = 1;
-	light2.position.z = 1;
-	_scene.add(new THREE.AmbientLight(0xf2c46f, 0.5));
-	_scene.add(light1);
-	_scene.add(light2);
+	_scene.add(new THREE.AmbientLight(0xf2c46f, 0.25));
 
 	// controls
 
@@ -153,21 +147,16 @@ function init_3d() {
 
 	//
 	
+	init_scenes();
 	draw();
 	
-	init_scenes();
+	//
+	
+	document.getElementById("loading").classList.add("hidden");
 }
 
 function draw() {
-	DATE = new Date();
-
 	_controls.update();
-
-	// _raycaster.setFromCamera(new THREE.Vector2(), _camera);
-	// const intersects = _raycaster.intersectObjects(_scene.children);
-	// if (intersects[0]) {
-	// 	intersects[0].object.material.color.set(0xff0000);
-	// }
 
 	// render
 
@@ -203,10 +192,10 @@ _controls.move = function(e) {
 			(_controls.pos.y - _controls.prevPos.y) * _controls.speed
 		);
 
-		_current_scene.rotation.y += _controls.offset.x;
-		// _current_scene.rotation.x -= _controls.offset.y;
+		_current_scene.group.rotation.y += _controls.offset.x;
+		// _current_scene.group.rotation.x -= _controls.offset.y;
 
-		// _current_scene.rotation.x = cap(_current_scene.rotation.x, -HALF_PI, HALF_PI);
+		// _current_scene.group.rotation.x = cap(_current_scene.group.rotation.x, -HALF_PI, HALF_PI);
 	}
 
 	// move action
@@ -224,6 +213,12 @@ function normalizedMousePosition(x, y) {
 
 _controls.select = function(e) { // mouseup
 	// click
+	_raycaster.setFromCamera(_controls.pos, _camera);
+	const intersects = _raycaster.intersectObjects(_current_scene.group.children);
+	if (intersects[0]) {
+		let obj = intersects[0].object.name;
+		_current_scene.key(obj);
+	}
 
 	// reset
 	_controls.touch = false;
@@ -277,6 +272,7 @@ class scene {
 		this.objects = p.objects;
 
 		this.init = p.init;
+		this.key = p.key;
 
 		var group = new THREE.Group();
 		group.visible = false;
@@ -294,25 +290,27 @@ class scene {
 		}
 		
 		if (_current_scene) {
-			_current_scene.visible = false;
+			_current_scene.group.visible = false;
 		}
 
 		this.group.visible = true;
 		this.group.rotation.set(0, 0, 0);
 
-		_current_scene = this.group;
+		_current_scene = this;
 	}
-}
-
-class screen {
-	constructor(p) {
-		this.id = ref.length;
-
-		ref.push(this);
-	}
-
-	check() {
-
+	
+	loadFromList(load) {
+		for (const name of load) {
+			var obj = assets.images[name];
+			var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
+			mesh.name = name;
+			mesh.position.set(obj.position.x, obj.position.y, obj.position.z);
+			mesh.rotation.set(obj.rotation.x, obj.rotation.y, obj.rotation.z);
+			mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+			mesh.castShadow = obj.castShadow;
+			mesh.receiveShadow = obj.receiveShadow;
+			this.group.add(mesh);
+		}
 	}
 }
 
@@ -366,12 +364,129 @@ var bedroom = new scene({
 			"deer"
 		];
 		
-		for (const obj of load) {
-			group.add(assets.images[obj]);
-		}
+		this.loadFromList(load);
+		
+		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
+		toplight.position.set(0, 13, 0);
+		toplight.lookAt(0, 0, 0);
+		toplight.castShadow = true;
+		toplight.shadow.bias = SHADOW_BIAS;
+		group.add(toplight);
 		
 		group.rotation.y = -1.7521712817716457;
+		_renderer.render(_scene, _camera);
 	},
+	key: function(obj) {
+		switch (obj) {
+			case "3":
+			case "6":
+			case "9":
+			case "12":
+			case "hour_hand":
+			case "minute_hand":
+			case "clock_lines":
+			case "clock":
+				clock.load();
+				break;
+			case "phone_case":
+			case "phone_screen":
+				phone.load();
+				break;
+			case "pc":
+			case "pc_screen":
+				pc.load();
+				break;
+		}
+	}
+});
+var phone = new scene({
+	music: "alarm",
+	init: function(group) {
+		const load = [
+			"phone_case",
+			"phone_screen",
+			
+			"deer"
+		];
+		
+		this.loadFromList(load);
+		
+		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
+		toplight.position.set(0, 13, 0);
+		toplight.lookAt(0, 0, 0);
+		toplight.castShadow = true;
+		toplight.shadow.bias = SHADOW_BIAS;
+		group.add(toplight);
+	},
+	key: function(obj) {
+		switch (obj) {
+			
+		}
+	}
+});
+var pc = new scene({
+	music: "alarm",
+	init: function(group) {
+		const load = [
+			"chair",
+			"desk",
+			"keyboar",
+			"mouse",
+			
+			"computer_plug",
+			"pc",
+			"pc_screen",
+			
+			"deer"
+		];
+		
+		this.loadFromList(load);
+		
+		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
+		toplight.position.set(0, 13, 0);
+		toplight.lookAt(0, 0, 0);
+		toplight.castShadow = true;
+		toplight.shadow.bias = SHADOW_BIAS;
+		group.add(toplight);
+	},
+	key: function(obj) {
+		switch (obj) {
+			
+		}
+	}
+});
+var clock = new scene({
+	music: "alarm",
+	init: function(group) {
+		const load = [
+			"chair",
+			"desk",
+			"keyboar",
+			"mouse",
+			
+			"floor",
+			
+			"computer_plug",
+			"pc",
+			"pc_screen",
+			
+			"deer"
+		];
+		
+		this.loadFromList(load);
+		
+		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
+		toplight.position.set(0, 13, 0);
+		toplight.lookAt(0, 0, 0);
+		toplight.castShadow = true;
+		toplight.shadow.bias = SHADOW_BIAS;
+		group.add(toplight);
+	},
+	key: function(obj) {
+		switch (obj) {
+			
+		}
+	}
 });
 
 function init_scenes() {
