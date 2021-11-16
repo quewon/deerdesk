@@ -558,8 +558,22 @@ var phone = new scene({
 		this.context.lineWidth = 2;
 		this.texture.minFilter = THREE.LinearFilter;
 		
-		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
-		toplight.position.set(0, 13, 0);
+		const pool = this.group.getObjectByName("pool");
+		pool.material = new THREE.MeshPhysicalMaterial({
+			emissiveMap: pool.material.map,
+			map: pool.material.map,
+			transparent: true,
+			opacity: 1,
+			transmission: 0.5,
+			roughness: 0,
+			specularIntensity: 1,
+			ior: 2,
+			reflectivity: 0.5,
+		});
+		pool.material.emissive = { r:1, g:1, b:1, isColor: true };
+		
+		const toplight = new THREE.PointLight(0xffffff, 0.5);
+		toplight.position.set(0, 2.1, 0);
 		toplight.lookAt(0, 0, 0);
 		toplight.castShadow = true;
 		toplight.shadow.bias = SHADOW_BIAS;
@@ -569,7 +583,8 @@ var phone = new scene({
 		// group.rotation.y = HALF_PI - 0.25;
 	},
 	withLoad: function() {
-		this.group.rotation.y = -HALF_PI - 1;
+		// this.group.rotation.y = -HALF_PI - 1;
+		this.group.rotation.y = HALF_PI - 0.25;
 		
 		_camera.position.set(0, 5, 35);
 		_camera.lookAt(0, 0, 0);
@@ -585,9 +600,11 @@ var phone = new scene({
 		const height = this.context.canvas.height;
 		const c = this.context;
 		c.clearRect(0, 0, width, height);
-		c.strokeRect(10, 10, width-20, height-20);
-		c.font = '48px serif';
-  	c.fillText('Hello world', 10, 50);
+		c.strokeRect(10, 10, width-20, 150);
+		c.strokeRect(10, 170, width-20, 150);
+		c.strokeRect(10, 330, width-20, 150);
+		c.font = "48px monospace";
+  	c.fillText('heyyy', 10, 50);
 		
 		this.texture.needsUpdate = true;
 	}
