@@ -565,11 +565,12 @@ var phone = new scene({
 		this.drawing_menu = document.getElementById("drawing_menu");
 		this.message = document.createElement("canvas").getContext("2d");
 		this.message.canvas.width = this.context.canvas.width-20;
-		this.message.canvas.height = this.context.canvas.height/2-120;
-		this.message.canvas.style.width = this.message.canvas.width+100+"px";
-		this.message.canvas.style.height = this.message.canvas.height+100+"px";
+		this.message.canvas.height = this.context.canvas.height/2-80;
+		let scale = _height/600;
+		this.message.canvas.style.width = this.message.canvas.width*scale+"px";
+		this.message.canvas.style.height = this.message.canvas.height*scale+"px";
 		this.message.canvas.style.zIndex = 10;
-		this.message.canvas.style.marginLeft = "10px";
+		this.message.canvas.style.marginLeft = "1em";
 		this.message.canvas.style.borderRadius = "2em";
 		this.message.canvas.classList.add("centered");
 		document.body.appendChild(this.message.canvas);
