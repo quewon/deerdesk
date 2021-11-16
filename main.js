@@ -314,11 +314,7 @@ class scene {
 	}
 
 	load() {
-		_controls.lockRotation = false;
-		
-		for (let child of document.getElementById("gameintro").children) {
-			child.classList.add("hidden");
-		}
+		game();
 		
 		if (this.neverLoaded) {
 			this.init(this.group);
@@ -707,18 +703,17 @@ function game(name) {
 	
 	if (name) {
 		const game = games[name];
+		intro.classList.remove("hidden");
 		
 		let span = intro.querySelector("span");
 		let canvas = intro.querySelector("canvas");
 		let button = intro.querySelector("button");
 		
-		intro.classList.remove("hidden");
-		span.classList.remove("hidden");
-		canvas.classList.remove("hidden");
-		button.classList.remove("hidden");
-		
 		span.innerHTML = game.title;
 		button.addEventListener("click", function() {
+			games[name].load();
+		});
+		button.addEventListener("touchend", function() {
 			games[name].load();
 		});
 		

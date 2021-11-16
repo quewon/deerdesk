@@ -88,8 +88,11 @@
 			z-index: 1;
 			text-align: center;
 		}
+		#gameintro span {
+			display: inline-block;
+		}
 		#gameintro canvas {
-			display: inline !important;
+			display: inline-block !important;
 			background: var(--light-bg);
 			margin: 1em;
 			border-radius: 50%;
@@ -127,7 +130,9 @@
 	</span>
 	<div id="gameintro" class="centered hidden">
 		<span></span>
+		<br>
 		<canvas></canvas>
+		<br>
 		<button>시작하기</button>
 	</div>
 
