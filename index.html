@@ -9,6 +9,8 @@
 		:root {
 			--bg: #384636;
 			--color: #f1e5d2;
+			--light: cyan;
+			--light-bg: rgba(0, 255, 255, 0.25);
 		}
 
 		html {
@@ -81,14 +83,53 @@
 		    95% { border-radius: 58% 42% 57% 43% / 53% 45% 55% 47%; }
 		    100%{ border-radius: 48% 52% 68% 32% / 42% 28% 72% 58%; }
 		}
+		
+		#gameintro {
+			z-index: 1;
+			text-align: center;
+		}
+		#gameintro canvas {
+			display: inline !important;
+			background: var(--light-bg);
+			margin: 1em;
+			border-radius: 50%;
+		}
+		
+		canvas {
+			z-index: -1;
+		}
+		
+		button {
+			padding: 0.5em;
+			font-family: inherit;
+			font-size: inherit;
+			color: inherit;
+			background: transparent;
+			border: inherit;
+			display: inline-block;
+			cursor: pointer;
+			background: var(--light-bg);
+			width: 10em;
+			border-radius: 1em;
+			color: var(--light);
+		}
+		
+		hr {
+			border-color: var(--light-bg);
+		}
 	</style>
 </head>
 <body>
 
 	<!-- <div id="bg" class="centered"></div> -->
 	<span id="loading" class="centered">
-		deerdesk에 오신 걸 환영합니다!
+		평소처럼 책상에 앉았다
 	</span>
+	<div id="gameintro" class="centered hidden">
+		<span></span>
+		<canvas></canvas>
+		<button>시작하기</button>
+	</div>
 
 </body>
 
@@ -96,4 +137,16 @@
 <script src="lib/howler.js"></script>
 <script type="module" src="lib/GLTFLoader.js"></script>
 <script type="module" src="main.js"></script>
+<!-- <script type="module">
+	import {clock, phone, pc} from './main.js';
+	document.getElementById("clock").querySelector("button").addEventListener("click", function() {
+		clock.load();
+	});
+	document.getElementById("phone").querySelector("button").addEventListener("click", function() {
+		phone.load();
+	});
+	document.getElementById("pc").querySelector("button").addEventListener("click", function() {
+		pc.load();
+	});
+</script> -->
 </html>

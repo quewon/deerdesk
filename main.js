@@ -5,9 +5,11 @@ var SHADOW_BIAS = -0.0002;
 
 var _width, _height;
 var _renderer, _camera, _raycaster;
+var _preview_renderer, _preview_camera;
 var _loader = new GLTFLoader();
 var _texture_loader = new THREE.TextureLoader();
 var _scene = new THREE.Scene();
+var _preview = new THREE.Scene();
 var _controls = {
 	touch: false,
 	pos: new THREE.Vector2(),
@@ -30,9 +32,11 @@ var _controls = {
 				_controls.offset.y -= offsetY;
 			}
 		}
-	}
+	},
+	lockRotation: false,
 };
 var _current_scene = null;
+var _current_preview = null;
 
 function init() {
 	// load assets
@@ -90,16 +94,19 @@ function init() {
 
 function init_3d() {
 	_renderer = new THREE.WebGLRenderer({ alpha: true });
-	// _renderer.setClearColor( 0x000000, 0 );
+	_preview_renderer = new THREE.WebGLRenderer({ alpha: true });
+	_preview_renderer.setClearColor( 0x384636, 0 );
 	
-	const fov = 75;
+	const fov = 50;
 	const aspect = 2;
 	const near = 1;
 	const far = 500;
 	_camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-	_camera.position.set(10, 10, 25);
+	_camera.position.set(0, 10, 35);
 	_camera.lookAt(0, 0, 0);
-	_camera.position.y += 3;
+	_camera.position.y += 5;
+	
+	_preview_camera = _camera.clone();
 
 	getSize();
 
@@ -109,12 +116,20 @@ function init_3d() {
 	_renderer.domElement.classList.add("centered");
 	_renderer.setPixelRatio(window.devicePixelRatio * 2);
 	document.body.appendChild( _renderer.domElement );
+	
+	_preview_renderer.outputEncoding = THREE.sRGBEncoding;
+	_preview_renderer.shadowMap.enabled = true;
+	_preview_renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+	_preview_renderer.setPixelRatio(window.devicePixelRatio * 2);
+	const intro = document.getElementById("gameintro");
+	intro.replaceChild(_preview_renderer.domElement, intro.querySelector("canvas"));
 
 	_raycaster = new THREE.Raycaster();
 	
 	//
 	
 	_scene.add(new THREE.AmbientLight(0xf2c46f, 0.25));
+	_preview.add(new THREE.AmbientLight(0xf2c46f, 0.25));
 
 	// controls
 
@@ -156,11 +171,14 @@ function init_3d() {
 }
 
 function draw() {
+	_current_scene.update();
+	if (_current_preview) _current_preview.update();
 	_controls.update();
 
 	// render
 
 	_renderer.render(_scene, _camera);
+	_preview_renderer.render(_preview, _preview_camera);
 
 	requestAnimationFrame(draw);
 }
@@ -186,7 +204,7 @@ _controls.move = function(e) {
 	_controls.pos.set(pos.x, pos.y);
 
 	// hold and drag action
-	if (_controls.touch) {
+	if (_controls.touch && !_controls.lockRotation) {
 		_controls.offset.set(
 			(_controls.pos.x - _controls.prevPos.x) * _controls.speed,
 			(_controls.pos.y - _controls.prevPos.y) * _controls.speed
@@ -218,6 +236,8 @@ _controls.select = function(e) { // mouseup
 	if (intersects[0]) {
 		let obj = intersects[0].object.name;
 		_current_scene.key(obj);
+	} else {
+		_current_scene.key(null);
 	}
 
 	// reset
@@ -240,21 +260,29 @@ function cap(value, min, max) {
 function getSize() {
 	_height = document.documentElement.clientHeight;
 	_width = document.documentElement.clientWidth;
+	
+	let prevsize;
 
 	if (_height <= _width) {
 		// _height = height;
 		// _width = height;/9*16;
 		_controls.speed = _controls.speedFactor * _height / 1000;
+		prevsize = _height/3;
 	} else {
 		// _height = width;/16*9;
 		// _width = width;
 		_controls.speed = _controls.speedFactor * _width / 1000;
+		prevsize = _width/3;
 	}
 	
 	_camera.aspect = _width / _height;
   _camera.updateProjectionMatrix();
+	
+	_preview_camera.aspect = 1;
+  _preview_camera.updateProjectionMatrix();
 
 	_renderer.setSize( _width, _height );
+	_preview_renderer.setSize(prevsize, prevsize);
 }
 
 function getMousePosition( dom, x, y ) {
@@ -279,11 +307,19 @@ class scene {
 		_scene.add(group);
 		this.group = group;
 		this.neverLoaded = true;
+		
+		this.update = p.update || function(){};
 
 		ref.push(this);
 	}
 
 	load() {
+		_controls.lockRotation = false;
+		
+		for (let child of document.getElementById("gameintro").children) {
+			child.classList.add("hidden");
+		}
+		
 		if (this.neverLoaded) {
 			this.init(this.group);
 			this.neverLoaded = false;
@@ -294,7 +330,6 @@ class scene {
 		}
 
 		this.group.visible = true;
-		this.group.rotation.set(0, 0, 0);
 
 		_current_scene = this;
 	}
@@ -311,6 +346,46 @@ class scene {
 			mesh.receiveShadow = obj.receiveShadow;
 			this.group.add(mesh);
 		}
+	}
+}
+
+class preview extends scene {
+	constructor(p) {
+		super(p);
+		
+		this.id = ref.length;
+		this.objects = p.objects;
+
+		this.init = p.init;
+		this.key = p.key;
+
+		var group = new THREE.Group();
+		group.visible = false;
+		_preview.add(group);
+		this.group = group;
+		this.neverLoaded = true;
+		
+		this.update = p.update || function(){};
+		this.withLoad = p.withLoad || function(){};
+
+		ref.push(this);
+	}
+	
+	load() {
+		if (this.neverLoaded) {
+			this.init(this.group);
+			this.neverLoaded = false;
+		}
+		
+		this.withLoad();
+		
+		if (_current_preview) {
+			_current_preview.group.visible = false;
+		}
+
+		this.group.visible = true;
+
+		_current_preview = this;
 	}
 }
 
@@ -373,7 +448,7 @@ var bedroom = new scene({
 		toplight.shadow.bias = SHADOW_BIAS;
 		group.add(toplight);
 		
-		group.rotation.y = -1.7521712817716457;
+		group.rotation.y = -2;
 		_renderer.render(_scene, _camera);
 	},
 	key: function(obj) {
@@ -386,15 +461,18 @@ var bedroom = new scene({
 			case "minute_hand":
 			case "clock_lines":
 			case "clock":
-				clock.load();
+				game("clock");
 				break;
 			case "phone_case":
 			case "phone_screen":
-				phone.load();
+				game("phone");
 				break;
 			case "pc":
 			case "pc_screen":
-				pc.load();
+				game("pc");
+				break;
+			default:
+				game();
 				break;
 		}
 	}
@@ -488,12 +566,177 @@ var clock = new scene({
 		}
 	}
 });
+var games = {
+	phone: {
+		title: "SNS에서 대화할 친구를 찾아<br>낚싯줄을 던졌다",
+		preview: new preview({
+			init: function(group) {
+				let center = "phone_case";
+				const load = [
+					"phone_case",
+					"phone_screen"
+				];
+				
+				center = assets.images[center];
+				for (const name of load) {
+					var obj = assets.images[name];
+					var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
+					mesh.name = name;
+					mesh.position.set(obj.position.x-center.position.x, obj.position.y-center.position.y, obj.position.z-center.position.z);
+					mesh.rotation.set(obj.rotation.x, obj.rotation.y, obj.rotation.z);
+					mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+					mesh.castShadow = obj.castShadow;
+					mesh.receiveShadow = obj.receiveShadow;
+					this.group.add(mesh);
+				}
+				const toplight = new THREE.SpotLight(0xffe01c, 0.75);
+				toplight.position.set(0, 13, 0);
+				toplight.lookAt(0, 0, 0);
+				toplight.castShadow = true;
+				toplight.shadow.bias = SHADOW_BIAS;
+				group.add(toplight);
+				
+				group.scale.set(2, 2, 2);
+			},
+			withLoad: function() {
+				_preview_camera.position.set(0, 10, 1);
+				_preview_camera.lookAt(0, 0, 0);
+				this.group.rotation.z = 0;
+				this.group.rotation.y = -Math.PI;
+			},
+			update: function() {
+				this.group.rotation.z += 0.01;
+				this.group.rotation.y += 0.01;
+			}
+		}),
+		load: function() { phone.load() }
+	},
+	pc: {
+		title: "집중력이 무너지는 것을<br>바라보기만 할 순 없었다",
+		preview: new preview({
+			init: function(group) {
+				let center = "pc";
+				const load = [
+					"pc",
+					"pc_screen"
+				];
+				
+				center = assets.images[center];
+				for (const name of load) {
+					var obj = assets.images[name];
+					var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
+					mesh.name = name;
+					mesh.position.set(obj.position.x-center.position.x, obj.position.y, obj.position.z-center.position.z);
+					mesh.rotation.set(obj.rotation.x, obj.rotation.y, obj.rotation.z);
+					mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+					mesh.castShadow = obj.castShadow;
+					mesh.receiveShadow = obj.receiveShadow;
+					this.group.add(mesh);
+				}
+				const toplight = new THREE.SpotLight(0xffe01c, 0.75);
+				toplight.position.set(0, 13, 0);
+				toplight.lookAt(0, 0, 0);
+				toplight.castShadow = true;
+				toplight.shadow.bias = SHADOW_BIAS;
+				group.add(toplight);
+			},
+			withLoad: function() {
+				_preview_camera.position.set(0, 10, 35);
+				_preview_camera.lookAt(0, 0, 0);
+				_preview_camera.position.set(0, 10, 10);
+				this.group.rotation.y = -Math.PI;
+			},
+			update: function() {
+				this.group.rotation.y += 0.01;
+			}
+		}),
+		load: function() { pc.load() }
+	},
+	clock: {
+		title: "시간 관리가 필요했다",
+		preview: new preview({
+			init: function(group) {
+				let center = "clock";
+				const load = [
+					"3",
+					"6",
+					"9",
+					"12",
+					"hour_hand",
+					"minute_hand",
+					"clock_lines",
+					"clock",
+				];
+				
+				center = assets.images[center];
+				for (const name of load) {
+					var obj = assets.images[name];
+					var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
+					mesh.name = name;
+					mesh.position.set(obj.position.x-center.position.x, obj.position.y-center.position.y, obj.position.z-center.position.z);
+					mesh.rotation.set(obj.rotation.x, obj.rotation.y, obj.rotation.z);
+					mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+					mesh.castShadow = obj.castShadow;
+					mesh.receiveShadow = obj.receiveShadow;
+					this.group.add(mesh);
+				}
+				const toplight = new THREE.SpotLight(0xffe01c, 0.75);
+				toplight.position.set(0, 13, 0);
+				toplight.lookAt(0, 0, 0);
+				toplight.castShadow = true;
+				toplight.shadow.bias = SHADOW_BIAS;
+				group.add(toplight);
+			},
+			withLoad: function() {
+				_preview_camera.position.set(0, 10, 1);
+				_preview_camera.lookAt(0, 0, 0);
+				this.group.rotation.z = 0;
+				this.group.rotation.y = -Math.PI;
+			},
+			update: function() {
+				this.group.rotation.z += 0.01;
+				this.group.rotation.y += 0.01;
+			}
+		}),
+		load: function() { clock.load() }
+	},
+}
+
+function game(name) {
+	const intro = document.getElementById("gameintro");
+	
+	if (name) {
+		const game = games[name];
+		
+		let span = intro.querySelector("span");
+		let canvas = intro.querySelector("canvas");
+		let button = intro.querySelector("button");
+		
+		intro.classList.remove("hidden");
+		span.classList.remove("hidden");
+		canvas.classList.remove("hidden");
+		button.classList.remove("hidden");
+		
+		span.innerHTML = game.title;
+		button.addEventListener("click", function() {
+			games[name].load();
+		});
+		
+		game.preview.load();
+		_controls.lockRotation = true;
+	} else {
+		intro.classList.add("hidden");
+		_controls.lockRotation = false;
+	}
+}
 
 function init_scenes() {
 	bedroom.load();
 	
 	console.log("all scenes loaded.");
 }
+
+export { phone, pc, clock }
 
 window.onload = function() {
 	init();
