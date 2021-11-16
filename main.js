@@ -528,6 +528,7 @@ var phone = new scene({
 			"pool",
 			
 			"screen",
+			"screen_back",
 			
 			"deer"
 		];
@@ -540,9 +541,22 @@ var phone = new scene({
 		
 		this.context = document.createElement("canvas").getContext("2d");
 		this.texture = new THREE.CanvasTexture(this.context.canvas);
+		this.texture.flipY = false;
+		this.context.strokeStyle = "#00ffff";
 		
 		const screen = this.group.getObjectByName("screen");
-		screen.material.map = this.texture;
+		const screen2 = this.group.getObjectByName("screen_back");
+    const box = new THREE.Box3().setFromObject(screen);
+		var height = box.max.y - box.min.y;
+		var width = box.max.z - box.min.z;
+		this.context.canvas.width = width * 50;
+		this.context.canvas.height = height * 50;
+		screen.material.map = screen2.material.map = this.texture;
+		screen.material.transparent = screen2.material.transparent = true;
+		screen.material.emissive = screen2.material.emissive = assets.images["pc_screen"].material.emissive;
+		this.context.strokeStyle = "#00ffff";
+		this.context.lineWidth = 2;
+		this.texture.minFilter = THREE.LinearFilter;
 		
 		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
 		toplight.position.set(0, 13, 0);
@@ -567,7 +581,13 @@ var phone = new scene({
 		}
 	},
 	update: function() {
-		this.context.fillRect(0, 0, this.context.canvas.width, this.context.canvas.height);
+		const width = this.context.canvas.width;
+		const height = this.context.canvas.height;
+		const c = this.context;
+		c.clearRect(0, 0, width, height);
+		c.strokeRect(10, 10, width-20, height-20);
+		c.font = '48px serif';
+  	c.fillText('Hello world', 10, 50);
 		
 		this.texture.needsUpdate = true;
 	}

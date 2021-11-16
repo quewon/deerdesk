@@ -26,6 +26,13 @@
 		  bottom: 0;
 			margin: 0;
 		}
+		
+		canvas {
+			image-rendering: -moz-crisp-edges;
+		  image-rendering: -webkit-crisp-edges;
+		  image-rendering: pixelated;
+		  image-rendering: crisp-edges;
+		}
 
 		.centered {
 			position: absolute;
@@ -123,6 +130,8 @@
 	<!-- <div id="bg" class="centered"></div> -->
 	<span id="loading" class="centered">
 		평소처럼 책상에 앉았다
+		<br><br>
+		<i>loading...</i>
 	</span>
 	<div id="gameintro" class="centered hidden">
 		<span></span>
