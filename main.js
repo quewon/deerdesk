@@ -126,7 +126,7 @@ function init_3d() {
 	
 	//
 	
-	_scene.add(new THREE.AmbientLight(0xf2c46f, 0.25));
+	_scene.add(new THREE.AmbientLight(0xf2c46f, 0.2));
 	_preview.add(new THREE.AmbientLight(0xf2c46f, 0.25));
 
 	// controls
@@ -262,13 +262,9 @@ function getSize() {
 	let prevsize;
 
 	if (_height <= _width) {
-		// _height = height;
-		// _width = height;/9*16;
 		_controls.speed = _controls.speedFactor * _height / 1000;
 		prevsize = _height/3;
 	} else {
-		// _height = width;/16*9;
-		// _width = width;
 		_controls.speed = _controls.speedFactor * _width / 1000;
 		prevsize = _width/3;
 	}
@@ -581,6 +577,12 @@ var phone = new scene({
 		
 		// game end
 		// group.rotation.y = HALF_PI - 0.25;
+		
+		// game objects
+		
+		this.bobber = this.group.getObjectByName("bobber");
+		this.bobber.point = this.bobber.position.y;
+		this.time = 0;
 	},
 	withLoad: function() {
 		// this.group.rotation.y = -HALF_PI - 1;
@@ -606,7 +608,11 @@ var phone = new scene({
 		c.font = "48px monospace";
   	c.fillText('heyyy', 10, 50);
 		
+		this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/6;
+		
 		this.texture.needsUpdate = true;
+		
+		this.time++;
 	}
 });
 var pc = new scene({
