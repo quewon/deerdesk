@@ -582,7 +582,29 @@ var phone = new scene({
 		
 		this.bobber = this.group.getObjectByName("bobber");
 		this.bobber.point = this.bobber.position.y;
-		this.time = 0;
+		this.state = "idle";
+		this.time = -100;
+		this.chance = 1000;
+		this.velocity = 0;
+		this.indicator = new THREE.Mesh(
+			new THREE.BoxGeometry(0.5, 4, 0.5),
+			new THREE.MeshStandardMaterial({
+				transparent: true,
+				opacity: 0.25,
+				transmission: 1,
+				roughness: 0,
+				specularIntensity: 1,
+				ior: 2,
+				reflectivity: 0.5,
+				color: 0x00ffff,
+				emissive: 0x00ffff,
+			}),
+		);
+		this.indicator.position.set(this.bobber.position.x, 4, this.bobber.position.z);
+		this.indicator.visible = false;
+		this.group.add(this.indicator);
+		this.wintime = 200;
+		this.pulltime = this.wintime;
 	},
 	withLoad: function() {
 		// this.group.rotation.y = -HALF_PI - 1;
@@ -606,11 +628,63 @@ var phone = new scene({
 		c.strokeRect(10, 170, width-20, 150);
 		c.strokeRect(10, 330, width-20, 150);
 		c.font = "48px monospace";
-  	c.fillText('heyyy', 10, 50);
-		
-		this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/6;
 		
 		this.texture.needsUpdate = true;
+		
+		// game
+		
+		switch (this.state) {
+			case "idle":
+				this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
+				
+				const rand = (Math.round(Math.random() * this.chance));
+				if (this.time % rand == 0) {
+					alert("화면을 눌러서 낚시찌를 파란 공간 안으로 끌어당기세요!");
+					this.state = "pull";
+					this.indicator.visible = true;
+					this.pulltime = this.wintime;
+				}
+				break;
+			case "pull":
+				this.indicator.position.y = 4 + Math.sin(this.time * 0.05);
+			
+				if (_controls.touch) {
+					this.velocity += 0.005;
+				} else {
+					this.velocity -= 0.01;
+					if (this.velocity < -0.2) { this.velocity = -0.2 }
+				}
+				this.bobber.position.y += this.velocity;
+				
+				if (this.bobber.position.y >= this.indicator.position.y-2 && this.bobber.position.y <= this.indicator.position.y+2) {
+					this.bobber.material.emissive = {r:0, g:1, b:1, isColor: true};
+					this.pulltime--;
+					c.fillText(this.pulltime, 10, 50);
+					
+					if (this.pulltime < 0) {
+						alert("성공적으로 낚시했습니다.");
+						this.state = "win";
+					}
+				} else {
+					this.bobber.material.emissive = null;
+					this.pulltime = this.wintime;
+					
+					if (this.bobber.position.y <= -10) {
+						alert("낚시찌를 놓쳐버렸습니다.");
+						this.state = "lose";
+						this.indicator.visible = false;
+					} else if (this.bobber.position.y > 9.44335) {
+						alert("낚시찌를 놓쳐버렸습니다.");
+						this.state = "lose";
+						this.indicator.visible = false;
+					}
+				}
+				break;
+			case "lose":
+			case "win":
+				bedroom.load();
+				break;
+		}
 		
 		this.time++;
 	}
