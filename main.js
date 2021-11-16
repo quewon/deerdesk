@@ -327,6 +327,9 @@ class scene {
 		this.group.visible = true;
 
 		_current_scene = this;
+		
+		console.log(this.id);
+		console.trace();
 	}
 	
 	loadFromList(load) {
@@ -396,12 +399,8 @@ function game(name) {
 		let button = intro.querySelector("button");
 		
 		span.innerHTML = game.title;
-		button.addEventListener("click", function() {
-			games[name].load();
-		});
-		button.addEventListener("touchend", function() {
-			games[name].load();
-		});
+		button.onclick = function() { games[name].load() };
+		button.ontouchend = function() { games[name].load() };
 		
 		game.preview.load();
 		_controls.lockRotation = true;
@@ -552,6 +551,7 @@ var phone = new scene({
 		screen.material.emissive = screen2.material.emissive = assets.images["pc_screen"].material.emissive;
 		this.context.strokeStyle = "#00ffff";
 		this.context.lineWidth = 2;
+		this.context.textAlign = "center";
 		this.texture.minFilter = THREE.LinearFilter;
 		
 		const pool = this.group.getObjectByName("pool");
@@ -603,6 +603,7 @@ var phone = new scene({
 		this.indicator.position.set(this.bobber.position.x, 4, this.bobber.position.z);
 		this.indicator.visible = false;
 		this.group.add(this.indicator);
+		this.time = -100;
 		this.wintime = 200;
 		this.pulltime = this.wintime;
 	},
@@ -624,10 +625,7 @@ var phone = new scene({
 		const height = this.context.canvas.height;
 		const c = this.context;
 		c.clearRect(0, 0, width, height);
-		c.strokeRect(10, 10, width-20, 150);
-		c.strokeRect(10, 170, width-20, 150);
-		c.strokeRect(10, 330, width-20, 150);
-		c.font = "48px monospace";
+		c.font = "40px monospace";
 		
 		this.texture.needsUpdate = true;
 		
@@ -639,11 +637,24 @@ var phone = new scene({
 				
 				const rand = (Math.round(Math.random() * this.chance));
 				if (this.time % rand == 0) {
-					alert("화면을 눌러서 낚시찌를 파란 공간 안으로 끌어당기세요!");
-					this.state = "pull";
+					// alert("화면을 눌러서 낚시찌를 파란 공간 안으로 끌어당기세요!");
+					this.state = "wait";
 					this.indicator.visible = true;
-					this.pulltime = this.wintime;
+					this.pulltime = 250;
 				}
+				break;
+			case "wait":
+				this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
+			
+				c.fillText("낚시찌를 파란 공간", width/2, 50);
+				c.fillText("안으로 끌어당겨서", width/2, 100);
+				c.fillText("관심을 끌었다", width/2, 150);
+				c.fillText(Math.ceil(this.pulltime/50), width/2, 200);
+				if (this.pulltime <= 0) {
+					this.pulltime = this.wintime;
+					this.state = "pull";
+				}
+				this.pulltime--;
 				break;
 			case "pull":
 				this.indicator.position.y = 4 + Math.sin(this.time * 0.05);
@@ -659,7 +670,7 @@ var phone = new scene({
 				if (this.bobber.position.y >= this.indicator.position.y-2 && this.bobber.position.y <= this.indicator.position.y+2) {
 					this.bobber.material.emissive = {r:0, g:1, b:1, isColor: true};
 					this.pulltime--;
-					c.fillText(this.pulltime, 10, 50);
+					c.fillRect(0, 0, this.pulltime/this.wintime * width, 10);
 					
 					if (this.pulltime < 0) {
 						alert("성공적으로 낚시했습니다.");
@@ -669,19 +680,22 @@ var phone = new scene({
 					this.bobber.material.emissive = null;
 					this.pulltime = this.wintime;
 					
-					if (this.bobber.position.y <= -10) {
-						alert("낚시찌를 놓쳐버렸습니다.");
+					if (this.bobber.position.y <= -10 || this.bobber.position.y > 9.44335) {
 						this.state = "lose";
 						this.indicator.visible = false;
-					} else if (this.bobber.position.y > 9.44335) {
-						alert("낚시찌를 놓쳐버렸습니다.");
-						this.state = "lose";
-						this.indicator.visible = false;
+						this.bobber.material.emissive = {r:0, g:1, b:1, isColor: true};
 					}
 				}
 				break;
 			case "lose":
+				// this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
+				this.time = -100;
+				this.state = "idle";
+				break;
 			case "win":
+				this.state = "idle";
+				this.indicator.visible = false;
+				this.time = -100;
 				bedroom.load();
 				break;
 		}
