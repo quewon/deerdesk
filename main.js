@@ -13,10 +13,11 @@ var _preview = new THREE.Scene();
 var _canvas = document.querySelector("canvas");
 var _controls = {
 	touch: false,
+	realPos: new THREE.Vector2(),
 	pos: new THREE.Vector2(),
 	prevPos: null,
 	offset: new THREE.Vector2(),
-	speedFactor: 3.5,
+	speedFactor: 2.25,
 	speed: undefined,
 	update: function() {
 		if (_controls.offset) {
@@ -157,6 +158,9 @@ function init_3d() {
 		_controls.select(e);
 	});
 	window.addEventListener("resize", getSize);
+	document.oncontextmenu = function() {
+		return false
+	};
 
 	//
 	
@@ -192,6 +196,7 @@ _controls.move = function(e) {
 		x = e.pageX;
 		y = e.pageY;
 	}
+	_controls.realPos.set(x, y);
 	let pos = normalizedMousePosition(x, y);
 
 	if (!_controls.prevPos) {
@@ -262,10 +267,10 @@ function getSize() {
 	let prevsize;
 
 	if (_height <= _width) {
-		_controls.speed = _controls.speedFactor * _height / 1000;
+		_controls.speed = _controls.speedFactor * _width / 1000;
 		prevsize = _height/3;
 	} else {
-		_controls.speed = _controls.speedFactor * _width / 1000;
+		_controls.speed = _controls.speedFactor * _height / 1000;
 		prevsize = _width/3;
 	}
 	
@@ -327,9 +332,6 @@ class scene {
 		this.group.visible = true;
 
 		_current_scene = this;
-		
-		console.log(this.id);
-		console.trace();
 	}
 	
 	loadFromList(load) {
@@ -399,11 +401,16 @@ function game(name) {
 		let button = intro.querySelector("button");
 		
 		span.innerHTML = game.title;
-		button.onclick = function() { games[name].load() };
-		button.ontouchend = function() { games[name].load() };
+		button.onclick = button.ontouchend = function() { games[name].load() };
 		
 		game.preview.load();
 		_controls.lockRotation = true;
+		
+		if (name == "phone" && window.player.messages.length > 0) {
+			document.getElementById("message_made").classList.remove("hidden");
+		} else {
+			document.getElementById("message_made").classList.add("hidden");
+		}
 	} else {
 		intro.classList.add("hidden");
 		_controls.lockRotation = false;
@@ -552,7 +559,68 @@ var phone = new scene({
 		this.context.strokeStyle = "#00ffff";
 		this.context.lineWidth = 2;
 		this.context.textAlign = "center";
+		this.context.font = "40px monospace";
 		this.texture.minFilter = THREE.LinearFilter;
+		
+		this.drawing_menu = document.getElementById("drawing_menu");
+		this.message = document.createElement("canvas").getContext("2d");
+		this.message.canvas.width = this.context.canvas.width-20;
+		this.message.canvas.height = this.context.canvas.height/2-120;
+		this.message.canvas.style.width = this.message.canvas.width+100+"px";
+		this.message.canvas.style.height = this.message.canvas.height+100+"px";
+		this.message.canvas.style.zIndex = 10;
+		this.message.canvas.style.marginLeft = "10px";
+		this.message.canvas.style.borderRadius = "2em";
+		this.message.canvas.classList.add("centered");
+		document.body.appendChild(this.message.canvas);
+		this.message.strokeStyle = "white";
+		this.message.lineWidth = 5;
+		this.message.lineCap = "round";
+		this.message.imageSmoothingEnabled = false;
+		
+		this.ui = document.createElement("div");
+		this.ui.id = "phone_ui";
+		let button = document.createElement("button");
+		button.textContent = "완료";
+		let eraser = document.createElement("button");
+		eraser.textContent = "전부 지우기";
+		button.onclick = button.ontouchend = function() {
+			if (window.player.messages.length == 0) {
+				let button = document.getElementById("message_made");
+				button.onclick = button.ontouchend = function() {
+					phone.load();
+					phone.state = "drawing";
+					phone.drawing_menu.classList.remove("hidden");
+					phone.message.canvas.classList.remove("hidden");
+					// _renderer.domElement.classList.add("hidden");
+					_controls.lockRotation = true;
+					_camera.position.set(0, 35, 0);
+					_camera.lookAt(0, 0, 0);
+					phone.group.rotation.y = 0;
+					phone.pulltime = -1;
+				}
+			}
+			let img = document.createElement("img");
+			img.src = phone.message.canvas.toDataURL();
+			window.player.messages.push(img);
+			
+			phone.state = "idle";
+			_camera.position.set(0, 5, 35);
+			_camera.lookAt(0, 0, 0);
+			_camera.position.y = 10;
+			phone.drawing_menu.classList.add("hidden");
+			phone.message.canvas.classList.add("hidden");
+			phone.ui.classList.add("hidden");
+			phone.group.rotation.y = HALF_PI - 0.25;
+			phone.pulltime = phone.wintime;
+		};
+		eraser.onclick = eraser.ontouchend = function() {
+			phone.pulltime = phone.message.canvas.height;
+		};
+		this.ui.appendChild(eraser);
+		this.ui.appendChild(button);
+		this.ui.classList.add("centered");
+		document.body.appendChild(this.ui);
 		
 		const pool = this.group.getObjectByName("pool");
 		pool.material = new THREE.MeshPhysicalMaterial({
@@ -582,38 +650,53 @@ var phone = new scene({
 		
 		this.bobber = this.group.getObjectByName("bobber");
 		this.bobber.point = this.bobber.position.y;
-		this.state = "idle";
-		this.time = -100;
 		this.chance = 1000;
-		this.velocity = 0;
 		this.indicator = new THREE.Mesh(
 			new THREE.BoxGeometry(0.5, 4, 0.5),
-			new THREE.MeshStandardMaterial({
+			new THREE.MeshPhysicalMaterial({
 				transparent: true,
 				opacity: 0.25,
-				transmission: 1,
+				transmission: 0.5,
 				roughness: 0,
-				specularIntensity: 1,
-				ior: 2,
+				specularIntensity: 0.5,
+				ior: 1,
 				reflectivity: 0.5,
 				color: 0x00ffff,
 				emissive: 0x00ffff,
 			}),
 		);
 		this.indicator.position.set(this.bobber.position.x, 4, this.bobber.position.z);
-		this.indicator.visible = false;
 		this.group.add(this.indicator);
-		this.time = -100;
-		this.wintime = 200;
-		this.pulltime = this.wintime;
 	},
 	withLoad: function() {
-		// this.group.rotation.y = -HALF_PI - 1;
-		this.group.rotation.y = HALF_PI - 0.25;
-		
-		_camera.position.set(0, 5, 35);
-		_camera.lookAt(0, 0, 0);
-		_camera.position.y = 10;
+		this.ui.classList.add("hidden");
+		this.message.clearRect(0, 0, this.message.canvas.width, this.message.canvas.height);
+		this.prevmouse = null;
+		this.velocity = 0;
+		this.indicator.visible = false;
+		this.time = -100;
+		this.wintime = 200;
+		if (window.player.messages.length == 0) {
+			this.state = "drawing";
+			this.drawing_menu.classList.remove("hidden");
+			this.message.canvas.classList.remove("hidden");
+			// _renderer.domElement.classList.add("hidden");
+			_controls.lockRotation = true;
+			_camera.position.set(0, 35, 0);
+			_camera.lookAt(0, 0, 0);
+			this.group.rotation.y = 0;
+			this.pulltime = -1;
+		} else {
+			this.state = "idle";
+			_camera.position.set(0, 5, 35);
+			_camera.lookAt(0, 0, 0);
+			_camera.position.y = 10;
+			this.drawing_menu.classList.add("hidden");
+			this.message.canvas.classList.add("hidden");
+			this.ui.classList.add("hidden");
+			this.group.rotation.y = HALF_PI - 0.25;
+			this.pulltime = this.wintime;
+		}
 	},
 	key: function(obj) {
 		switch (obj) {
@@ -621,17 +704,54 @@ var phone = new scene({
 		}
 	},
 	update: function() {
-		const width = this.context.canvas.width;
-		const height = this.context.canvas.height;
 		const c = this.context;
-		c.clearRect(0, 0, width, height);
-		c.font = "40px monospace";
+		const width = c.canvas.width;
+		const height = c.canvas.height;
 		
+		c.clearRect(0, 0, width, height);
 		this.texture.needsUpdate = true;
 		
 		// game
 		
 		switch (this.state) {
+			case "drawing":
+				this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
+				
+				const m = this.message;
+				
+				m.clearRect(0, this.pulltime, m.canvas.width, 1);
+				if (this.pulltime > -1) {
+					this.pulltime--;
+				}
+				
+				if (_controls.touch) {
+					const rect = m.canvas.getBoundingClientRect();
+					const scaleX = m.canvas.width / rect.width;
+		      const scaleY = m.canvas.height / rect.height;
+					const mouse = {
+						x: (_controls.realPos.x-rect.left) * scaleX,
+						y: (_controls.realPos.y-rect.top) * scaleY,
+					};
+					
+					if (this.prevmouse) {
+						m.beginPath();
+		        m.moveTo(this.prevmouse.x, this.prevmouse.y);
+		        m.lineTo(mouse.x, mouse.y);
+		        m.stroke();
+		        m.closePath();
+						
+						this.ui.classList.remove("hidden");
+					}
+					
+					this.prevmouse = {
+						x: mouse.x,
+						y: mouse.y
+					};
+				} else {
+					this.prevmouse = null;
+				}
+				
+				break;
 			case "idle":
 				this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
 				
@@ -693,9 +813,6 @@ var phone = new scene({
 				this.state = "idle";
 				break;
 			case "win":
-				this.state = "idle";
-				this.indicator.visible = false;
-				this.time = -100;
 				bedroom.load();
 				break;
 		}
@@ -854,7 +971,7 @@ var games = {
 		load: function() { pc.load() }
 	},
 	clock: {
-		title: "시간 관리가 필요했다",
+		title: "과제가 쌓인 오후<br>시간 관리가 필요했다",
 		preview: new preview({
 			init: function(group) {
 				let center = "clock";

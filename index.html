@@ -12,6 +12,17 @@
 			--light: cyan;
 			--light-bg: rgba(0, 255, 255, 0.25);
 		}
+		
+		* {
+			-webkit-touch-callout: none; /* iOS Safari */
+	    -webkit-user-select: none; /* Safari */
+	     -khtml-user-select: none; /* Konqueror HTML */
+	       -moz-user-select: none; /* Old versions of Firefox */
+	        -ms-user-select: none; /* Internet Explorer/Edge */
+	            user-select: none; /* Non-prefixed version, currently
+	                                  supported by Chrome, Edge, Opera and Firefox */
+			outline: none;
+		}
 
 		html {
 			overflow: hidden;
@@ -44,10 +55,6 @@
 			font-size: 20px;
 			min-width: 20em;
 			font-family: 'Josefin Sans', monospace;
-		}
-
-		.hidden {
-			display: none !important;
 		}
 
 		#bg {
@@ -118,10 +125,33 @@
 			width: 10em;
 			border-radius: 1em;
 			color: var(--light);
+			transition: all 300ms ease-out;
+			margin-left: 0.5em;
+			margin-right: 0.5em;
+		}
+		button:active {
+			background: var(--bg);
 		}
 		
 		hr {
 			border-color: var(--light-bg);
+		}
+		
+		#phone_ui {
+			margin-top: 10em;
+			z-index: 11;
+			width: 100vw;
+		}
+		#phone_ui button {
+			/* background: transparent; */
+			/* border-top: 1px solid var(--light); */
+			/* border-bottom: 1px solid var(--light); */
+			/* border-radius: 0; */
+			color: white;
+		}
+		
+		.hidden {
+			display: none !important;
 		}
 	</style>
 </head>
@@ -139,6 +169,12 @@
 		<canvas></canvas>
 		<br>
 		<button>시작하기</button>
+		<button id="message_made" class="hidden">쪽지 그리고 시작하기</button>
+	</div>
+	
+	<div id="drawing_menu" class="centered hidden">
+		남들을 위한 쪽지를 그려<br>
+		그걸 미끼로 삼았다
 	</div>
 
 </body>
@@ -147,16 +183,15 @@
 <script src="lib/howler.js"></script>
 <script type="module" src="lib/GLTFLoader.js"></script>
 <script type="module" src="main.js"></script>
-<!-- <script type="module">
-	import {clock, phone, pc} from './main.js';
-	document.getElementById("clock").querySelector("button").addEventListener("click", function() {
-		clock.load();
-	});
-	document.getElementById("phone").querySelector("button").addEventListener("click", function() {
-		phone.load();
-	});
-	document.getElementById("pc").querySelector("button").addEventListener("click", function() {
-		pc.load();
-	});
-</script> -->
+<script>
+	var player = {
+		wins: {
+			phone: 0,
+			clock: 0,
+			pc: 0,
+		},
+		username: "",
+		messages: [],
+	};
+</script>
 </html>
