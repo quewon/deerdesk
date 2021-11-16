@@ -391,6 +391,8 @@ class preview extends scene {
 
 function game(name) {
 	const intro = document.getElementById("gameintro");
+	const lf = "◍";
+	const le = "◌";
 	
 	if (name) {
 		const game = games[name];
@@ -399,9 +401,19 @@ function game(name) {
 		let span = intro.querySelector("span");
 		let canvas = intro.querySelector("canvas");
 		let button = intro.querySelector("button");
+		let levels = intro.querySelector("div");
 		
 		span.innerHTML = game.title;
 		button.onclick = button.ontouchend = function() { games[name].load() };
+		
+		levels.textContent = "";
+		for (let i=1; i<=5; i++) {
+			if (i <= window.player.wins[name]) {
+				levels.textContent += lf+" ";
+			} else {
+				levels.textContent += le+" ";
+			}
+		}
 		
 		game.preview.load();
 		_controls.lockRotation = true;
@@ -565,12 +577,12 @@ var phone = new scene({
 		this.drawing_menu = document.getElementById("drawing_menu");
 		this.message = document.createElement("canvas").getContext("2d");
 		this.message.canvas.width = this.context.canvas.width-20;
-		this.message.canvas.height = this.context.canvas.height/2-80;
+		this.message.canvas.height = this.context.canvas.height/2-60;
 		let scale = _height/600;
 		this.message.canvas.style.width = this.message.canvas.width*scale+"px";
 		this.message.canvas.style.height = this.message.canvas.height*scale+"px";
 		this.message.canvas.style.zIndex = 10;
-		this.message.canvas.style.marginLeft = "1em";
+		this.message.canvas.style.marginLeft = 11*scale+"px";
 		this.message.canvas.style.borderRadius = "2em";
 		this.message.canvas.classList.add("centered");
 		document.body.appendChild(this.message.canvas);
@@ -670,6 +682,7 @@ var phone = new scene({
 		this.group.add(this.indicator);
 	},
 	withLoad: function() {
+		this.level = 0;
 		this.ui.classList.add("hidden");
 		this.message.clearRect(0, 0, this.message.canvas.width, this.message.canvas.height);
 		this.prevmouse = null;
@@ -701,7 +714,13 @@ var phone = new scene({
 	},
 	key: function(obj) {
 		switch (obj) {
-			
+			case "deer":
+				if (this.level > window.player.wins.phone) {
+					window.player.wins.phone = this.level;
+				}
+				bedroom.load();
+				game("phone");
+				break;
 		}
 	},
 	update: function() {
@@ -711,6 +730,9 @@ var phone = new scene({
 		
 		c.clearRect(0, 0, width, height);
 		this.texture.needsUpdate = true;
+		
+		let lvl = this.level;
+		if (lvl == 0) lvl = 1;
 		
 		// game
 		
@@ -735,6 +757,10 @@ var phone = new scene({
 					};
 					
 					if (this.prevmouse) {
+						// const a = this.prevmouse.x-mouse.x;
+						// const b = this.prevmouse.y-mouse.y;
+						// const dist = Math.sqrt(a*a + b*b)*10;
+						// this.message.lineWidth = 100 * 1/dist;
 						m.beginPath();
 		        m.moveTo(this.prevmouse.x, this.prevmouse.y);
 		        m.lineTo(mouse.x, mouse.y);
@@ -772,13 +798,13 @@ var phone = new scene({
 				c.fillText("관심을 끌었다", width/2, 150);
 				c.fillText(Math.ceil(this.pulltime/50), width/2, 200);
 				if (this.pulltime <= 0) {
-					this.pulltime = this.wintime;
+					this.pulltime = this.wintime * lvl/2;
 					this.state = "pull";
 				}
 				this.pulltime--;
 				break;
 			case "pull":
-				this.indicator.position.y = 4 + Math.sin(this.time * 0.05);
+				this.indicator.position.y = 4 + Math.sin(this.time * 0.05 * lvl/2);
 			
 				if (_controls.touch) {
 					this.velocity += 0.005;
@@ -791,15 +817,14 @@ var phone = new scene({
 				if (this.bobber.position.y >= this.indicator.position.y-2 && this.bobber.position.y <= this.indicator.position.y+2) {
 					this.bobber.material.emissive = {r:0, g:1, b:1, isColor: true};
 					this.pulltime--;
-					c.fillRect(0, 0, this.pulltime/this.wintime * width, 10);
+					c.fillRect(0, 0, this.pulltime/(this.wintime * lvl/2) * width, 10);
 					
 					if (this.pulltime < 0) {
-						alert("성공적으로 낚시했습니다.");
 						this.state = "win";
 					}
 				} else {
 					this.bobber.material.emissive = null;
-					this.pulltime = this.wintime;
+					this.pulltime = this.wintime * lvl/2;
 					
 					if (this.bobber.position.y <= -10 || this.bobber.position.y > 9.44335) {
 						this.state = "lose";
@@ -809,12 +834,28 @@ var phone = new scene({
 				}
 				break;
 			case "lose":
-				// this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
-				this.time = -100;
-				this.state = "idle";
+				bedroom.load();
+				if (this.level > window.player.wins.phone) {
+					window.player.wins.phone = this.level;
+				}
+				game("phone");
 				break;
 			case "win":
-				bedroom.load();
+				// this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
+				
+				this.level++;
+				
+				this.state = "idle";
+				_camera.position.set(0, 5, 35);
+				_camera.lookAt(0, 0, 0);
+				_camera.position.y = 10;
+				this.drawing_menu.classList.add("hidden");
+				this.message.canvas.classList.add("hidden");
+				this.ui.classList.add("hidden");
+				this.group.rotation.y = HALF_PI - 0.25;
+				this.pulltime = this.wintime;
+				this.indicator.visible = false;
+				
 				break;
 		}
 		
