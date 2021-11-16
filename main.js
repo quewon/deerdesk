@@ -10,6 +10,7 @@ var _loader = new GLTFLoader();
 var _texture_loader = new THREE.TextureLoader();
 var _scene = new THREE.Scene();
 var _preview = new THREE.Scene();
+var _canvas = document.querySelector("canvas");
 var _controls = {
 	touch: false,
 	pos: new THREE.Vector2(),
@@ -102,9 +103,6 @@ function init_3d() {
 	const near = 1;
 	const far = 500;
 	_camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-	_camera.position.set(0, 10, 35);
-	_camera.lookAt(0, 0, 0);
-	_camera.position.y += 5;
 	
 	_preview_camera = _camera.clone();
 
@@ -283,6 +281,8 @@ function getSize() {
 
 	_renderer.setSize( _width, _height );
 	_preview_renderer.setSize(prevsize, prevsize);
+	_canvas.width = _width;
+	_canvas.height = _height;
 }
 
 function getMousePosition( dom, x, y ) {
@@ -309,6 +309,7 @@ class scene {
 		this.neverLoaded = true;
 		
 		this.update = p.update || function(){};
+		this.withLoad = p.withLoad || function(){};
 
 		ref.push(this);
 	}
@@ -320,6 +321,8 @@ class scene {
 			this.init(this.group);
 			this.neverLoaded = false;
 		}
+		
+		this.withLoad();
 		
 		if (_current_scene) {
 			_current_scene.group.visible = false;
@@ -385,11 +388,49 @@ class preview extends scene {
 	}
 }
 
+function game(name) {
+	const intro = document.getElementById("gameintro");
+	
+	if (name) {
+		const game = games[name];
+		intro.classList.remove("hidden");
+		
+		let span = intro.querySelector("span");
+		let canvas = intro.querySelector("canvas");
+		let button = intro.querySelector("button");
+		
+		span.innerHTML = game.title;
+		button.addEventListener("click", function() {
+			games[name].load();
+		});
+		button.addEventListener("touchend", function() {
+			games[name].load();
+		});
+		
+		game.preview.load();
+		_controls.lockRotation = true;
+	} else {
+		intro.classList.add("hidden");
+		_controls.lockRotation = false;
+	}
+}
+
+function init_scenes() {
+	bedroom.load();
+	
+	console.log("all scenes loaded.");
+}
+
+window.onload = function() {
+	init();
+};
+
 //
 
 var assets = {
 	images: {
 		"bedroom": "images/bedroom.glb",
+		"phone": "images/phone.glb",
 	},
 	sounds: {
 		"alarm": { src: "sounds/alarm.wav", loop: true },
@@ -447,6 +488,11 @@ var bedroom = new scene({
 		group.rotation.y = -2;
 		_renderer.render(_scene, _camera);
 	},
+	withLoad: function() {
+		_camera.position.set(0, 10, 35);
+		_camera.lookAt(0, 0, 0);
+		_camera.position.y = 15;
+	},
 	key: function(obj) {
 		switch (obj) {
 			case "3":
@@ -477,13 +523,26 @@ var phone = new scene({
 	music: "alarm",
 	init: function(group) {
 		const load = [
-			"phone_case",
-			"phone_screen",
+			"bobber",
+			"fishing_phone",
+			"pool",
+			
+			"screen",
 			
 			"deer"
 		];
 		
 		this.loadFromList(load);
+		
+		const deer = this.group.getObjectByName("deer");
+		deer.position.set(-9.25, 5.25745, -2.55082);
+		deer.rotation.y = HALF_PI;
+		
+		this.context = document.createElement("canvas").getContext("2d");
+		this.texture = new THREE.CanvasTexture(this.context.canvas);
+		
+		const screen = this.group.getObjectByName("screen");
+		screen.material.map = this.texture;
 		
 		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
 		toplight.position.set(0, 13, 0);
@@ -491,11 +550,26 @@ var phone = new scene({
 		toplight.castShadow = true;
 		toplight.shadow.bias = SHADOW_BIAS;
 		group.add(toplight);
+		
+		// game end
+		// group.rotation.y = HALF_PI - 0.25;
+	},
+	withLoad: function() {
+		this.group.rotation.y = -HALF_PI - 1;
+		
+		_camera.position.set(0, 5, 35);
+		_camera.lookAt(0, 0, 0);
+		_camera.position.y = 10;
 	},
 	key: function(obj) {
 		switch (obj) {
 			
 		}
+	},
+	update: function() {
+		this.context.fillRect(0, 0, this.context.canvas.width, this.context.canvas.height);
+		
+		this.texture.needsUpdate = true;
 	}
 });
 var pc = new scene({
@@ -697,42 +771,3 @@ var games = {
 		load: function() { clock.load() }
 	},
 }
-
-function game(name) {
-	const intro = document.getElementById("gameintro");
-	
-	if (name) {
-		const game = games[name];
-		intro.classList.remove("hidden");
-		
-		let span = intro.querySelector("span");
-		let canvas = intro.querySelector("canvas");
-		let button = intro.querySelector("button");
-		
-		span.innerHTML = game.title;
-		button.addEventListener("click", function() {
-			games[name].load();
-		});
-		button.addEventListener("touchend", function() {
-			games[name].load();
-		});
-		
-		game.preview.load();
-		_controls.lockRotation = true;
-	} else {
-		intro.classList.add("hidden");
-		_controls.lockRotation = false;
-	}
-}
-
-function init_scenes() {
-	bedroom.load();
-	
-	console.log("all scenes loaded.");
-}
-
-export { phone, pc, clock }
-
-window.onload = function() {
-	init();
-};
