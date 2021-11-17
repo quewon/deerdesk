@@ -29,8 +29,10 @@ var _controls = {
 				let offsetX = _controls.offset.x * 0.05;
 				let offsetY = _controls.offset.y * 0.05;
 
-				_current_scene.group.rotation.y += offsetX;
+				if (!_controls.lockRotation) {
+					_current_scene.group.rotation.y += offsetX;
 				// _current_scene.group.rotation.x -= offsetY;
+				}
 
 				// _current_scene.group.rotation.x = cap(_current_scene.group.rotation.x, -HALF_PI, HALF_PI);
 
@@ -150,9 +152,9 @@ function init_3d() {
 	// _composer = new EffectComposer(_renderer);
 	// _composer.addPass(new RenderPass(_scene, _camera));
 	// const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
-	// 			bloomPass.threshold = 0.65;
-	// 			bloomPass.strength = 0.5;
-	// 			bloomPass.radius = 0;
+	// 			bloomPass.threshold = 0.4;
+	// 			bloomPass.strength = 0.3;
+	// 			bloomPass.radius = 1.5;
 	// _composer.addPass(bloomPass);
 	// _composer.addPass(new BokehPass(_scene, _camera, {
 	// 	focus: 0.5,
@@ -247,13 +249,15 @@ _controls.move = function(e) {
 	_controls.pos.set(pos.x, pos.y);
 
 	// hold and drag action
-	if (_controls.touch && !_controls.lockRotation) {
+	if (_controls.touch) {
 		_controls.offset.set(
 			(_controls.pos.x - _controls.prevPos.x) * _controls.speed,
 			(_controls.pos.y - _controls.prevPos.y) * _controls.speed
 		);
-
-		_current_scene.group.rotation.y += _controls.offset.x;
+		
+		if (!_controls.lockRotation) {
+			_current_scene.group.rotation.y += _controls.offset.x;
+		}
 		// _current_scene.group.rotation.x -= _controls.offset.y;
 
 		// _current_scene.group.rotation.x = cap(_current_scene.group.rotation.x, -HALF_PI, HALF_PI);
@@ -428,7 +432,7 @@ function endgame(name) {
 	}
 	
 	bedroom.load();
-	game(name);
+	// game(name);
 }
 
 function game(name) {
@@ -776,6 +780,9 @@ var phone = new scene({
 					pause("phone");
 				}
 				break;
+			default:
+				game();
+				break;
 		}
 	},
 	update: function() {
@@ -957,61 +964,163 @@ var pc = new scene({
 			emissive: 0x00ffff,
 		});
 		
-		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
-		toplight.position.set(0, 13, 0);
+		const toplight = new THREE.PointLight(0xffe01c, 0.75);
+		toplight.position.set(0, 70, 0);
 		toplight.lookAt(0, 0, 0);
 		toplight.castShadow = true;
 		toplight.shadow.bias = SHADOW_BIAS;
 		group.add(toplight);
+		
+		// cannon.js initialization
+		
+		var world = new CANNON.World();
+		world.broadphase = new CANNON.NaiveBroadphase();
+		world.gravity.set(0, -1, 0);
+		
+		this.blockmat = new CANNON.Material("slipperyMaterial");
+		var groundmat = new CANNON.Material("groundMaterial");
+    world.addContactMaterial(new CANNON.ContactMaterial(this.blockmat, groundmat, {
+			friction: 10,
+      restitution: 0.2,
+      contactEquationStiffness: 1e8,
+      contactEquationRelaxation: 3,
+      frictionEquationStiffness: 1e8,
+      frictionEquationRegularizationTime: 3,
+		}));
+		
+		this.world = world;
+		
+		var box = new THREE.Box3().setFromObject(platform);
+		platform.SIZE = {
+			height: box.max.y-box.min.y,
+			width: box.max.z-box.min.z,
+			depth: box.max.x-box.min.x,
+		};
+		var shape = new CANNON.Box(new CANNON.Vec3(
+			platform.SIZE.depth/2,
+			platform.SIZE.height/2,
+			platform.SIZE.width/2,
+		));
+		var body = new CANNON.Body({
+			mass: 2515 * shape.volume(),
+			type: CANNON.Body.KINEMATIC,
+			position: new CANNON.Vec3(0, platform.position.y, 0),
+			material: groundmat,
+		});
+		body.addShape(shape);
+		this.world.addBody(body);
+		platform.CANNON = body;
+		
+		// game
+		
+		this.randomBlocks = [
+			"chair",
+			"pc",
+			"deer",
+			"desk",
+			"clock",
+		];
+		
+		this.createBlock = function(x) {
+			// const obj = assets.models[this.randomBlocks[this.randomBlocks.length * Math.random() | 0]];
+			
+			var width, height, depth;
+			// var height = 1;
+			width = height = depth = platform.SIZE.depth/3;
+			// var depth = 1;
+			var mesh = new THREE.Mesh(
+				new THREE.BoxGeometry(depth, height, width),
+				new THREE.MeshPhysicalMaterial({
+					transparent: true,
+					opacity: 1,
+					transmission: 0.5,
+					roughness: 0,
+					specularIntensity: 0.5,
+					ior: 1,
+					reflectivity: 0.5,
+					color: 0x00ffff,
+					emissive: 0x00ffff,
+				}),
+			);
+			var shape = new CANNON.Box(new CANNON.Vec3(depth/2, height/2, width/2));
+			var body = new CANNON.Body({
+				mass: 2515 * shape.volume(),
+				position: new CANNON.Vec3(x, this.dropHeight, 0),
+				material: this.blockmat,
+			});
+			body.addShape(shape);
+			mesh.CANNON = body;
+			mesh.TIME = 0;
+			
+			this.queue.push(mesh);
+		};
+		
+		this.dropBlock = function(x) {
+			x = x || 0;
+			
+			this.createBlock(x);
+			
+			const obj = this.queue.shift();
+			this.group.add(obj);
+			this.active.push(obj);
+			this.world.addBody(obj.CANNON);
+			
+			console.log("block deployed");
+		};
+		
+		this.platform = platform;
+		
+		this.dropHeight = 50;
+		this.threshold = 150;
 	},
 	withLoad: function() {
-		_camera.position.set(0, 10, -75);
+		_controls.lockRotation = true;
+		_camera.position.set(0, 0, -60);
 		_camera.lookAt(0, 0, 0);
 		_camera.position.y = 20;
 		
-		_controls.lockRotation = true;
-		
 		this.reload = function() {
 			this.state = "dropping";
-			
-			const zoomblocks = [
-				"deer",
-				"pc",
-				"chair",
-				"desk",
-			];
-			
+			this.active = [];
 			this.queue = [];
-			// var q = ["zoombar"];
-			var q = [];
-			for (let i=0; i<9; i++) {
-				q.push(zoomblocks[Math.random() * zoomblocks.length | 0]);
-			};
-			
-			for (const name of q) {
-				var obj = assets.models[name];
-				var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
-				mesh.name = name;
-				mesh.position.set(obj.position.x, obj.position.y, obj.position.z);
-				mesh.rotation.set(obj.rotation.x, obj.rotation.y, obj.rotation.z);
-				mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
-				mesh.castShadow = obj.castShadow;
-				mesh.receiveShadow = obj.receiveShadow;
-				this.queue.push(mesh);
-			}
 		};
 		this.reload();
+		this.dropBlock();
 	},
 	key: function(obj) {
 		switch (obj) {
 			case "deer":
 				pause("pc");
 				break;
+			default:
+				game();
+				_controls.lockRotation = true;
+				break;
 		}
 	},
 	update: function() {
 		switch (this.state) {
 			case "dropping":
+				var platform = this.platform.CANNON;
+				if (_controls.offset) {
+					platform.position.x -= _controls.offset.x * _controls.speed * 10;
+				}
+			
+				// physics affects render
+				this.world.step(0.05);
+				for (let block of this.active) {
+					block.position.copy(block.CANNON.position);
+					const q = block.CANNON.quaternion;
+					block.rotation.set(q.x, q.y, q.z);
+					if (block.TIME > -1) {
+						block.TIME++;
+						if (block.TIME > this.threshold) {
+							block.TIME = -1;
+							this.dropBlock();
+						}
+					}
+				}
+				this.platform.position.copy(platform.position);
 				
 				break;
 		}
