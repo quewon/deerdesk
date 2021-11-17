@@ -412,6 +412,25 @@ class preview extends scene {
 	}
 }
 
+function pause(name) {
+	game("pause");
+	const button = document.querySelector("#gameintro button");
+	button.onclick = button.ontouchend = function() { endgame(name); }
+}
+
+function endgame(name) {
+	switch (name) {
+		case "phone":
+			phone.drawing_menu.classList.add("hidden");
+			phone.message.canvas.classList.add("hidden");
+			phone.ui.classList.add("hidden");
+			break;
+	}
+	
+	bedroom.load();
+	game(name);
+}
+
 function game(name) {
 	const intro = document.getElementById("gameintro");
 	const lf = "◍";
@@ -426,7 +445,9 @@ function game(name) {
 		let levels = intro.querySelector("div");
 		
 		span.innerHTML = game.title;
-		button.onclick = button.ontouchend = function() { games[name].load(); };
+		if (name != "pause") {
+			button.onclick = button.ontouchend = function() { games[name].load(); };
+		}
 		
 		levels.textContent = "";
 		for (let i=1; i<=5; i++) {
@@ -440,10 +461,19 @@ function game(name) {
 		game.preview.load();
 		_controls.lockRotation = true;
 		
-		if (name == "phone" && window.player.messages.length > 0) {
-			document.getElementById("message_made").classList.remove("hidden");
-		} else {
-			document.getElementById("message_made").classList.add("hidden");
+		document.getElementById("message_made").classList.add("hidden");
+		levels.classList.remove("hidden");
+		button.textContent = "시작하기";
+		switch (name) {
+			case "phone":
+				if (window.player.messages.length > 0) {
+					document.getElementById("message_made").classList.remove("hidden");
+				}
+				break;
+			case "pause":
+				button.textContent = "방으로 돌아가기";
+				levels.classList.add("hidden");
+				break;
 		}
 	} else {
 		intro.classList.add("hidden");
@@ -743,11 +773,7 @@ var phone = new scene({
 					if (this.level > window.player.wins.phone) {
 						window.player.wins.phone = this.level;
 					}
-					bedroom.load();
-					game("phone");
-					this.drawing_menu.classList.add("hidden");
-					this.message.canvas.classList.add("hidden");
-					this.ui.classList.add("hidden");
+					pause("phone");
 				}
 				break;
 		}
@@ -863,14 +889,10 @@ var phone = new scene({
 				}
 				break;
 			case "lose":
-				bedroom.load();
 				if (this.level > window.player.wins.phone) {
 					window.player.wins.phone = this.level;
 				}
-				game("phone");
-				this.drawing_menu.classList.add("hidden");
-				this.message.canvas.classList.add("hidden");
-				this.ui.classList.add("hidden");
+				pause("phone");
 				break;
 			case "win":
 				// this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
@@ -947,15 +969,50 @@ var pc = new scene({
 		_camera.lookAt(0, 0, 0);
 		_camera.position.y = 20;
 		
-		this.state = "idle";
+		_controls.lockRotation = true;
+		
+		this.reload = function() {
+			this.state = "dropping";
+			
+			const zoomblocks = [
+				"deer",
+				"pc",
+				"chair",
+				"desk",
+			];
+			
+			this.queue = [];
+			// var q = ["zoombar"];
+			var q = [];
+			for (let i=0; i<9; i++) {
+				q.push(zoomblocks[Math.random() * zoomblocks.length | 0]);
+			};
+			
+			for (const name of q) {
+				var obj = assets.models[name];
+				var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
+				mesh.name = name;
+				mesh.position.set(obj.position.x, obj.position.y, obj.position.z);
+				mesh.rotation.set(obj.rotation.x, obj.rotation.y, obj.rotation.z);
+				mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+				mesh.castShadow = obj.castShadow;
+				mesh.receiveShadow = obj.receiveShadow;
+				this.queue.push(mesh);
+			}
+		};
+		this.reload();
 	},
 	key: function(obj) {
 		switch (obj) {
 			case "deer":
-				if (this.state == "idle") {
-					bedroom.load();
-					game("pc");
-				}
+				pause("pc");
+				break;
+		}
+	},
+	update: function() {
+		switch (this.state) {
+			case "dropping":
+				
 				break;
 		}
 	}
@@ -994,6 +1051,44 @@ var clock = new scene({
 	}
 });
 var games = {
+	pause: {
+		title: "게임을 종료할까요?",
+		preview: new preview({
+			init: function(group) {
+				let center = "deer";
+				const load = [
+					"deer"
+				];
+				center = assets.models[center];
+				for (const name of load) {
+					var obj = assets.models[name];
+					var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
+					mesh.name = name;
+					mesh.position.set(obj.position.x-center.position.x, obj.position.y-center.position.y, obj.position.z-center.position.z);
+					mesh.rotation.set(obj.rotation.x, obj.rotation.y, obj.rotation.z);
+					mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+					mesh.castShadow = obj.castShadow;
+					mesh.receiveShadow = obj.receiveShadow;
+					this.group.add(mesh);
+				}
+				const toplight = new THREE.SpotLight(0xffe01c, 0.75);
+				toplight.position.set(0, 0, 10);
+				toplight.lookAt(0, 0, 0);
+				toplight.castShadow = true;
+				toplight.shadow.bias = SHADOW_BIAS;
+				group.add(toplight);
+			},
+			withLoad: function() {
+				_preview_camera.position.set(0, 0, 13);
+				_preview_camera.lookAt(0, 0, 0);
+				this.group.rotation.y = -HALF_PI;
+			},
+			update: function() {
+				this.group.rotation.y += 0.01;
+			},
+		}),
+		load: function() { bedroom.load(); }
+	},
 	phone: {
 		title: "SNS에서 대화할 친구를 찾아<br>낚싯줄을 던졌다",
 		preview: new preview({
