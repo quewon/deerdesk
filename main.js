@@ -1,10 +1,14 @@
 import {GLTFLoader} from "./lib/GLTFLoader.js";
+import {EffectComposer} from "./lib/EffectComposer.js";
+import {RenderPass} from "./lib/RenderPass.js";
+import {UnrealBloomPass} from "./lib/UnrealBloomPass.js";
+import {BokehPass} from './lib/BokehPass.js';
 
 var HALF_PI = Math.PI / 2;
 var SHADOW_BIAS = -0.0002;
 
 var _width, _height;
-var _renderer, _camera, _raycaster;
+var _renderer, _camera, _raycaster, _composer;
 var _preview_renderer, _preview_camera;
 var _loader = new GLTFLoader();
 var _texture_loader = new THREE.TextureLoader();
@@ -57,18 +61,37 @@ function init() {
 			}
 		});
 	}
-
+	
 	function loadimgs() {
-		var imgs = {};
 		let imgcounter = 0;
-		
-		const texture = _texture_loader.load("images/palette.png");
-		texture.encoding = THREE.sRGBEncoding;
-		texture.flipY = false;
 		
 		for (const name in assets.images) {
 			imgcounter++;
-			_loader.load(assets.images[name], function(gltf) {
+			
+			var img = document.createElement("img");
+			img.src = assets.images[name];
+			assets.images[name] = img;
+			img.onload = function() {
+				imgcounter--;
+				if (imgcounter == 0) {
+					console.log("all images loaded.");
+					loadmodels();
+				}
+			};
+		}
+	}
+
+	function loadmodels() {
+		var models = {};
+		let mcounter = 0;
+		
+		const texture = _texture_loader.load(assets.images.texture.src);
+		texture.encoding = THREE.sRGBEncoding;
+		texture.flipY = false;
+		
+		for (const name in assets.models) {
+			mcounter++;
+			_loader.load(assets.models[name], function(gltf) {
 				const group = gltf.scene;
 				
 				for (let child of group.children) {
@@ -80,13 +103,13 @@ function init() {
 						child.castShadow = true;
 						child.receiveShadow = true;
 					}
-					imgs[child.name] = child;
+					models[child.name] = child;
 				}
 				
-				imgcounter--;
-				if (imgcounter == 0) {
-					assets.images = imgs;
-					console.log("all images loaded.");
+				mcounter--;
+				if (mcounter == 0) {
+					assets.models = models;
+					console.log("all models loaded.");
 					init_3d();
 				}
 			});
@@ -97,6 +120,7 @@ function init() {
 function init_3d() {
 	_renderer = new THREE.WebGLRenderer({ alpha: true });
 	_preview_renderer = new THREE.WebGLRenderer({ alpha: true });
+	_renderer.setClearColor( 0x384636, 0 );
 	_preview_renderer.setClearColor( 0x384636, 0 );
 	
 	const fov = 50;
@@ -122,6 +146,21 @@ function init_3d() {
 	_preview_renderer.setPixelRatio(window.devicePixelRatio * 2);
 	const intro = document.getElementById("gameintro");
 	intro.replaceChild(_preview_renderer.domElement, intro.querySelector("canvas"));
+	
+	// _composer = new EffectComposer(_renderer);
+	// _composer.addPass(new RenderPass(_scene, _camera));
+	// const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+	// 			bloomPass.threshold = 0.65;
+	// 			bloomPass.strength = 0.5;
+	// 			bloomPass.radius = 0;
+	// _composer.addPass(bloomPass);
+	// _composer.addPass(new BokehPass(_scene, _camera, {
+	// 	focus: 0.5,
+	// 	aperture: 0,
+	// 	maxblur: 0.01,
+	// 	// width: _width,
+	// 	// height: _height,
+  // }));
 
 	_raycaster = new THREE.Raycaster();
 	
@@ -144,7 +183,7 @@ function init_3d() {
 	});
 	document.addEventListener("touchmove", function(e) {
 		_controls.move(e);
-	})
+	});
 	document.addEventListener("mouseup", function(e) {
 		_controls.select(e);
 	});
@@ -159,7 +198,7 @@ function init_3d() {
 	});
 	window.addEventListener("resize", getSize);
 	document.oncontextmenu = function() {
-		return false
+		return false;
 	};
 
 	//
@@ -180,6 +219,7 @@ function draw() {
 	// render
 
 	_renderer.render(_scene, _camera);
+	// _composer.render();
 	_preview_renderer.render(_preview, _preview_camera);
 
 	requestAnimationFrame(draw);
@@ -221,7 +261,7 @@ _controls.move = function(e) {
 
 	// move action
 
-}
+};
 
 function normalizedMousePosition(x, y) {
 	const rect = _renderer.domElement.getBoundingClientRect();
@@ -229,7 +269,7 @@ function normalizedMousePosition(x, y) {
 	return {
 		x: ((x - rect.left) / rect.width * 2) - 1,
 		y: - ((y - rect.top) / rect.height * 2) + 1,
-	}
+	};
 }
 
 _controls.select = function(e) { // mouseup
@@ -246,19 +286,7 @@ _controls.select = function(e) { // mouseup
 	// reset
 	_controls.touch = false;
 	_controls.prevPos = null;
-}
-
-function cap(value, min, max) {
-	if (value < min) {
-		return min
-	}
-
-	if (value > max) {
-		return max
-	}
-
-	return value
-}
+};
 
 function getSize() {
 	_height = document.documentElement.clientHeight;
@@ -284,11 +312,6 @@ function getSize() {
 	_preview_renderer.setSize(prevsize, prevsize);
 	_canvas.width = _width;
 	_canvas.height = _height;
-}
-
-function getMousePosition( dom, x, y ) {
-	const rect = dom.getBoundingClientRect();
-	return [ ( x - rect.left ) / rect.width, ( y - rect.top ) / rect.height ];
 }
 
 // SCENES
@@ -336,7 +359,7 @@ class scene {
 	
 	loadFromList(load) {
 		for (const name of load) {
-			var obj = assets.images[name];
+			var obj = assets.models[name];
 			var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
 			mesh.name = name;
 			mesh.position.set(obj.position.x, obj.position.y, obj.position.z);
@@ -399,12 +422,11 @@ function game(name) {
 		intro.classList.remove("hidden");
 		
 		let span = intro.querySelector("span");
-		let canvas = intro.querySelector("canvas");
 		let button = intro.querySelector("button");
 		let levels = intro.querySelector("div");
 		
 		span.innerHTML = game.title;
-		button.onclick = button.ontouchend = function() { games[name].load() };
+		button.onclick = button.ontouchend = function() { games[name].load(); };
 		
 		levels.textContent = "";
 		for (let i=1; i<=5; i++) {
@@ -435,16 +457,16 @@ function init_scenes() {
 	console.log("all scenes loaded.");
 }
 
-window.onload = function() {
-	init();
-};
-
 //
 
 var assets = {
+	models: {
+		"bedroom": "models/bedroom.glb",
+		"phone": "models/phone.glb",
+		"pc": "models/pc.glb",
+	},
 	images: {
-		"bedroom": "images/bedroom.glb",
-		"phone": "images/phone.glb",
+		"texture": "images/palette.png",
 	},
 	sounds: {
 		"alarm": { src: "sounds/alarm.wav", loop: true },
@@ -567,7 +589,7 @@ var phone = new scene({
 		this.context.canvas.height = height * 50;
 		screen.material.map = screen2.material.map = this.texture;
 		screen.material.transparent = screen2.material.transparent = true;
-		screen.material.emissive = screen2.material.emissive = assets.images["pc_screen"].material.emissive;
+		screen.material.emissive = screen2.material.emissive = assets.models["pc_screen"].material.emissive;
 		this.context.strokeStyle = "#00ffff";
 		this.context.lineWidth = 2;
 		this.context.textAlign = "center";
@@ -611,7 +633,7 @@ var phone = new scene({
 					_camera.lookAt(0, 0, 0);
 					phone.group.rotation.y = 0;
 					phone.pulltime = -1;
-				}
+				};
 			}
 			let img = document.createElement("img");
 			img.src = phone.message.canvas.toDataURL();
@@ -626,6 +648,7 @@ var phone = new scene({
 			phone.ui.classList.add("hidden");
 			phone.group.rotation.y = HALF_PI - 0.25;
 			phone.pulltime = phone.wintime;
+			_controls.lockRotation = false;
 		};
 		eraser.onclick = eraser.ontouchend = function() {
 			phone.pulltime = phone.message.canvas.height;
@@ -710,16 +733,22 @@ var phone = new scene({
 			this.ui.classList.add("hidden");
 			this.group.rotation.y = HALF_PI - 0.25;
 			this.pulltime = this.wintime;
+			_controls.lockRotation = false;
 		}
 	},
 	key: function(obj) {
 		switch (obj) {
 			case "deer":
-				if (this.level > window.player.wins.phone) {
-					window.player.wins.phone = this.level;
+				if (this.state != "pull" && this.state != "wait") {
+					if (this.level > window.player.wins.phone) {
+						window.player.wins.phone = this.level;
+					}
+					bedroom.load();
+					game("phone");
+					this.drawing_menu.classList.add("hidden");
+					this.message.canvas.classList.add("hidden");
+					this.ui.classList.add("hidden");
 				}
-				bedroom.load();
-				game("phone");
 				break;
 		}
 	},
@@ -786,20 +815,20 @@ var phone = new scene({
 				if (this.time % rand == 0) {
 					// alert("화면을 눌러서 낚시찌를 파란 공간 안으로 끌어당기세요!");
 					this.state = "wait";
-					this.indicator.visible = true;
 					this.pulltime = 250;
 				}
 				break;
 			case "wait":
 				this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
 			
-				c.fillText("낚시찌를 파란 공간", width/2, 50);
-				c.fillText("안으로 끌어당겨서", width/2, 100);
-				c.fillText("관심을 끌었다", width/2, 150);
-				c.fillText(Math.ceil(this.pulltime/50), width/2, 200);
+				// c.fillText("낚시찌를 파란 공간", width/2, 50);
+				// c.fillText("안으로 끌어당겨서", width/2, 100);
+				// c.fillText("관심을 끌었다", width/2, 150);
+				c.fillText(Math.ceil(this.pulltime/50), width/2, 50);
 				if (this.pulltime <= 0) {
 					this.pulltime = this.wintime * lvl/2;
 					this.state = "pull";
+					this.indicator.visible = true;
 				}
 				this.pulltime--;
 				break;
@@ -810,7 +839,7 @@ var phone = new scene({
 					this.velocity += 0.005;
 				} else {
 					this.velocity -= 0.01;
-					if (this.velocity < -0.2) { this.velocity = -0.2 }
+					if (this.velocity < -0.2) { this.velocity = -0.2; }
 				}
 				this.bobber.position.y += this.velocity;
 				
@@ -839,6 +868,9 @@ var phone = new scene({
 					window.player.wins.phone = this.level;
 				}
 				game("phone");
+				this.drawing_menu.classList.add("hidden");
+				this.message.canvas.classList.add("hidden");
+				this.ui.classList.add("hidden");
 				break;
 			case "win":
 				// this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
@@ -852,7 +884,6 @@ var phone = new scene({
 				this.drawing_menu.classList.add("hidden");
 				this.message.canvas.classList.add("hidden");
 				this.ui.classList.add("hidden");
-				this.group.rotation.y = HALF_PI - 0.25;
 				this.pulltime = this.wintime;
 				this.indicator.visible = false;
 				
@@ -866,19 +897,43 @@ var pc = new scene({
 	music: "alarm",
 	init: function(group) {
 		const load = [
+			"floor",
+			
 			"chair",
 			"desk",
 			"keyboar",
 			"mouse",
 			
-			"computer_plug",
 			"pc",
 			"pc_screen",
 			
-			"deer"
+			"deer",
+			
+			"platform",
 		];
 		
 		this.loadFromList(load);
+		
+		const desk = this.group.getObjectByName("desk");
+		const moveWithDesk = ["chair", "keyboar", "mouse", "pc", "pc_screen", "deer", "desk"];
+		for (let name of moveWithDesk) {
+			let obj = this.group.getObjectByName(name);
+			obj.position.x -= desk.position.x;
+			obj.position.z -= desk.position.z;
+		}
+		
+		const platform = this.group.getObjectByName("platform");
+		platform.material = new THREE.MeshPhysicalMaterial({
+			transparent: true,
+			opacity: 1,
+			transmission: 0.5,
+			roughness: 0,
+			specularIntensity: 0.5,
+			ior: 1,
+			reflectivity: 0.5,
+			color: 0x00ffff,
+			emissive: 0x00ffff,
+		});
 		
 		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
 		toplight.position.set(0, 13, 0);
@@ -887,9 +942,21 @@ var pc = new scene({
 		toplight.shadow.bias = SHADOW_BIAS;
 		group.add(toplight);
 	},
+	withLoad: function() {
+		_camera.position.set(0, 10, -75);
+		_camera.lookAt(0, 0, 0);
+		_camera.position.y = 20;
+		
+		this.state = "idle";
+	},
 	key: function(obj) {
 		switch (obj) {
-			
+			case "deer":
+				if (this.state == "idle") {
+					bedroom.load();
+					game("pc");
+				}
+				break;
 		}
 	}
 });
@@ -937,9 +1004,9 @@ var games = {
 					"phone_screen"
 				];
 				
-				center = assets.images[center];
+				center = assets.models[center];
 				for (const name of load) {
-					var obj = assets.images[name];
+					var obj = assets.models[name];
 					var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
 					mesh.name = name;
 					mesh.position.set(obj.position.x-center.position.x, obj.position.y-center.position.y, obj.position.z-center.position.z);
@@ -969,7 +1036,7 @@ var games = {
 				this.group.rotation.y += 0.01;
 			}
 		}),
-		load: function() { phone.load() }
+		load: function() { phone.load(); }
 	},
 	pc: {
 		title: "집중력이 무너지는 것을<br>바라보기만 할 순 없었다",
@@ -981,9 +1048,9 @@ var games = {
 					"pc_screen"
 				];
 				
-				center = assets.images[center];
+				center = assets.models[center];
 				for (const name of load) {
-					var obj = assets.images[name];
+					var obj = assets.models[name];
 					var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
 					mesh.name = name;
 					mesh.position.set(obj.position.x-center.position.x, obj.position.y, obj.position.z-center.position.z);
@@ -1010,7 +1077,7 @@ var games = {
 				this.group.rotation.y += 0.01;
 			}
 		}),
-		load: function() { pc.load() }
+		load: function() { pc.load(); }
 	},
 	clock: {
 		title: "과제가 쌓인 오후<br>시간 관리가 필요했다",
@@ -1028,9 +1095,9 @@ var games = {
 					"clock",
 				];
 				
-				center = assets.images[center];
+				center = assets.models[center];
 				for (const name of load) {
-					var obj = assets.images[name];
+					var obj = assets.models[name];
 					var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
 					mesh.name = name;
 					mesh.position.set(obj.position.x-center.position.x, obj.position.y-center.position.y, obj.position.z-center.position.z);
@@ -1058,6 +1125,10 @@ var games = {
 				this.group.rotation.y += 0.01;
 			}
 		}),
-		load: function() { clock.load() }
+		load: function() { clock.load(); }
 	},
-}
+};
+
+window.onload = function() {
+	init();
+};
