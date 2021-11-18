@@ -159,7 +159,7 @@ function init_3d() {
 	// _composer.addPass(new BokehPass(_scene, _camera, {
 	// 	focus: 0.5,
 	// 	aperture: 0,
-	// 	maxblur: 0.01,
+	// 	maxblur: 0.05,
 	// 	// width: _width,
 	// 	// height: _height,
   // }));
@@ -293,20 +293,22 @@ _controls.select = function(e) { // mouseup
 };
 
 function getSize() {
-	_height = document.documentElement.clientHeight;
-	_width = document.documentElement.clientWidth;
+	let height = document.documentElement.clientHeight;
+	let width = document.documentElement.clientWidth;
 	
-	let prevsize;
-
-	if (_height <= _width) {
-		_controls.speed = _controls.speedFactor * _width / 1000;
-		prevsize = _height/3;
-	} else {
-		_controls.speed = _controls.speedFactor * _height / 1000;
-		prevsize = _width/3;
+	if (height <= width) {
+		_height = height;
+		_width = height;
+		_controls.speed = _controls.speedFactor * width/height / 3;
+	} else if (height > width) {
+		_width = width;
+		_height = width;
+		_controls.speed = _controls.speedFactor * height/width / 3;
 	}
 	
-	_camera.aspect = _width / _height;
+	let prevsize = _height/3;
+	
+	_camera.aspect = 1;
   _camera.updateProjectionMatrix();
 	
 	_preview_camera.aspect = 1;
@@ -436,6 +438,8 @@ function endgame(name) {
 }
 
 function game(name) {
+	_controls.touch = false;
+	
 	const intro = document.getElementById("gameintro");
 	const lf = "◍";
 	const le = "◌";
@@ -955,7 +959,6 @@ var pc = new scene({
 			ior: 1,
 			reflectivity: 0.5,
 			color: 0x00ffff,
-			emissive: 0x00ffff,
 		});
 		
 		const toplight = new THREE.PointLight(0xffe01c, 0.75);
@@ -970,25 +973,6 @@ var pc = new scene({
 		var world = new CANNON.World();
 		world.broadphase = new CANNON.NaiveBroadphase();
 		world.gravity.set(0, -9.8/2, 0);
-		
-		this.blockmat = new CANNON.Material("groundMaterial");
-		var groundmat = new CANNON.Material("groundMaterial");
-    world.addContactMaterial(new CANNON.ContactMaterial(this.blockmat, groundmat, {
-			friction: 10,
-      restitution: 0.2,
-      contactEquationStiffness: 1e8,
-      contactEquationRelaxation: 10,
-      frictionEquationStiffness: 1e8,
-      frictionEquationRegularizationTime: 3,
-		}));
-		world.addContactMaterial(new CANNON.ContactMaterial(this.blockmat, this.blockmat, {
-			friction: 15,
-      restitution: 0.2,
-      contactEquationStiffness: 1e8,
-      contactEquationRelaxation: 3,
-      frictionEquationStiffness: 1e8,
-      frictionEquationRegularizationTime: 3,
-		}));
 		
 		this.world = world;
 		
@@ -1007,7 +991,6 @@ var pc = new scene({
 			mass: 2515 * shape.volume(),
 			type: CANNON.Body.KINEMATIC,
 			position: new CANNON.Vec3(0, platform.position.y, 0),
-			material: groundmat,
 		});
 		body.addShape(shape);
 		body.children = [];
@@ -1047,7 +1030,9 @@ var pc = new scene({
 		];
 		
 		this.createBlock = function(x) {
-			// const obj = assets.models[this.randomBlocks[this.randomBlocks.length * Math.random() | 0]];
+			if (x == undefined) {
+				x = Math.ceil(Math.random() * this.dropWidth) * (Math.round(Math.random()) ? 1 : -1);
+			}
 			
 			var width, height, depth;
 			// var height = 1;
@@ -1065,13 +1050,15 @@ var pc = new scene({
 					reflectivity: 0.5,
 					color: 0x00ffff,
 					emissive: 0x00ffff,
+					// color: 0x00ffff,
 				}),
 			);
+			mesh.castShadow = true;
+			mesh.receiveShadow = true;
 			var shape = new CANNON.Box(new CANNON.Vec3(depth/2, height/2, width/2));
 			var body = new CANNON.Body({
 				mass: 200 * shape.volume(),
 				position: new CANNON.Vec3(x, this.dropHeight, 0),
-				material: this.blockmat,
 			});
 			mesh.position.copy(body.position);
 			body.children = [];
@@ -1092,12 +1079,12 @@ var pc = new scene({
 			this.queue.push(mesh);
 		};
 		
-		this.dropBlock = function(x) {
-			x = x || Math.ceil(Math.random() * this.dropWidth) * (Math.round(Math.random()) ? 1 : -1);
+		this.dropBlock = function(obj) {
+			if (this.queue.length == 0) {
+				this.createBlock();
+			}
+			obj = this.queue.shift();
 			
-			this.createBlock(x);
-			
-			const obj = this.queue.shift();
 			this.gamegroup.add(obj);
 			this.active.push(obj);
 			this.world.addBody(obj.CANNON);
@@ -1132,6 +1119,7 @@ var pc = new scene({
 			this.group.add(this.gamegroup);
 			this.world.bodies = [this.platform.CANNON];
 			
+			this.createBlock(0);
 			this.dropBlock();
 		};
 		this.reload();
