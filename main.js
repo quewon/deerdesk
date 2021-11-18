@@ -348,8 +348,6 @@ class scene {
 			this.neverLoaded = false;
 		}
 		
-		this.withLoad();
-		
 		if (_current_scene) {
 			_current_scene.group.visible = false;
 		}
@@ -357,6 +355,8 @@ class scene {
 		this.group.visible = true;
 
 		_current_scene = this;
+		
+		this.withLoad();
 	}
 	
 	loadFromList(load) {
@@ -417,7 +417,9 @@ class preview extends scene {
 function pause(name) {
 	game("pause");
 	const button = document.querySelector("#gameintro button");
-	button.onclick = button.ontouchend = function() { endgame(name); }
+	button.onclick = button.ontouchend = function() {
+		endgame(name);
+	}
 }
 
 function endgame(name) {
@@ -878,7 +880,18 @@ var phone = new scene({
 					c.fillRect(0, 0, this.pulltime/(this.wintime * lvl/2) * width, 10);
 					
 					if (this.pulltime < 0) {
-						this.state = "win";
+						// win
+						this.level++;
+				
+						this.state = "idle";
+						_camera.position.set(0, 5, 35);
+						_camera.lookAt(0, 0, 0);
+						_camera.position.y = 10;
+						this.drawing_menu.classList.add("hidden");
+						this.message.canvas.classList.add("hidden");
+						this.ui.classList.add("hidden");
+						this.pulltime = this.wintime;
+						this.indicator.visible = false;
 					}
 				} else {
 					this.bobber.material.emissive = null;
@@ -888,30 +901,15 @@ var phone = new scene({
 						this.state = "lose";
 						this.indicator.visible = false;
 						this.bobber.material.emissive = {r:0, g:1, b:1, isColor: true};
+						if (this.level > window.player.wins.phone) {
+							window.player.wins.phone = this.level;
+						}
+						pause("phone");
+						_controls.lockRotation = false;
 					}
 				}
 				break;
 			case "lose":
-				if (this.level > window.player.wins.phone) {
-					window.player.wins.phone = this.level;
-				}
-				pause("phone");
-				break;
-			case "win":
-				// this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
-				
-				this.level++;
-				
-				this.state = "idle";
-				_camera.position.set(0, 5, 35);
-				_camera.lookAt(0, 0, 0);
-				_camera.position.y = 10;
-				this.drawing_menu.classList.add("hidden");
-				this.message.canvas.classList.add("hidden");
-				this.ui.classList.add("hidden");
-				this.pulltime = this.wintime;
-				this.indicator.visible = false;
-				
 				break;
 		}
 		
@@ -971,12 +969,20 @@ var pc = new scene({
 		
 		var world = new CANNON.World();
 		world.broadphase = new CANNON.NaiveBroadphase();
-		world.gravity.set(0, -1, 0);
+		world.gravity.set(0, -9.8/2, 0);
 		
-		this.blockmat = new CANNON.Material("slipperyMaterial");
+		this.blockmat = new CANNON.Material("groundMaterial");
 		var groundmat = new CANNON.Material("groundMaterial");
     world.addContactMaterial(new CANNON.ContactMaterial(this.blockmat, groundmat, {
 			friction: 10,
+      restitution: 0.2,
+      contactEquationStiffness: 1e8,
+      contactEquationRelaxation: 10,
+      frictionEquationStiffness: 1e8,
+      frictionEquationRegularizationTime: 3,
+		}));
+		world.addContactMaterial(new CANNON.ContactMaterial(this.blockmat, this.blockmat, {
+			friction: 15,
       restitution: 0.2,
       contactEquationStiffness: 1e8,
       contactEquationRelaxation: 3,
@@ -1008,22 +1014,26 @@ var pc = new scene({
 		body.SIZE = platform.SIZE;
 		body.addEventListener("collide", function(e) {
 			if (e.body.position.y > this.position.y) {
+				for (let child of this.children) {
+					if (child.id == e.body.id) {
+						return;
+					}
+				}
+				
 				this.children.push(e.body);
-				console.log(this.children[0]);
+				e.body.parent = this;
 			}
 		});
 		platform.CANNON = body;
 		
 		this.checkContact = function(bodyA, bodyB) {
-			function bodiesAreInContact(bodyA, bodyB) {
-		    for(var i=0; i<world.contacts.length; i++) {
+			for(var i=0; i<world.contacts.length; i++) {
 	        var c = world.contacts[i];
 	        if((c.bi === bodyA && c.bj === bodyB) || (c.bi === bodyB && c.bj === bodyA)) {
             return true;
 	        }
 		    }
 		    return false;
-			}
 		};
 		
 		// game
@@ -1059,9 +1069,21 @@ var pc = new scene({
 			);
 			var shape = new CANNON.Box(new CANNON.Vec3(depth/2, height/2, width/2));
 			var body = new CANNON.Body({
-				mass: 2515 * shape.volume(),
+				mass: 200 * shape.volume(),
 				position: new CANNON.Vec3(x, this.dropHeight, 0),
 				material: this.blockmat,
+			});
+			mesh.position.copy(body.position);
+			body.children = [];
+			body.addEventListener("collide", function(e) {
+				if ((e.body.position.y > this.position.y) && !('parent' in e.body)) {
+					for (let child of this.children) {
+						if (child.id == e.body.id) {
+							return;
+						}
+					}
+					this.children.push(e.body);
+				}
 			});
 			body.addShape(shape);
 			mesh.CANNON = body;
@@ -1126,27 +1148,12 @@ var pc = new scene({
 	update: function() {
 		switch (this.state) {
 			case "dropping":
-				var platform = this.platform.CANNON;
-				if (_controls.offset) {
-					platform.position.x -= _controls.offset.x * _controls.speed * 10;
-					if (platform.position.x < -this.dropWidth) {
-						platform.position.x = -this.dropWidth;
-					} else if (platform.position.x > this.dropWidth) {
-						platform.position.x = this.dropWidth;
-					}
-				}
-				
 				this.world.step(0.05);
-				for (let child of platform.children) {
-					if (!pc.checkContact(platform, child)) {
-						platform.children.splice(platform.children.indexOf(child), 1);
-					} else {
-						child.position.x = platform.position.x;
-					}
-				}
-				this.platform.position.copy(platform.position);
 				
-				for (let block of this.active) {
+				// blocks
+				
+				for (let i=this.active.length-1; i>=0; i--) {
+					let block = this.active[i];
 					if (block.TIME > -1) {
 						block.TIME++;
 						if (block.TIME > this.threshold) {
@@ -1156,6 +1163,7 @@ var pc = new scene({
 							var points = Math.floor(this.active.length/2);
 							if (window.player.wins.pc < points) {
 								window.player.wins.pc = points;
+								console.log(this.active.length, points);
 							}
 						}
 					}
@@ -1165,10 +1173,43 @@ var pc = new scene({
 						_controls.lockRotation = false;
 					}
 					
+					for (let child of block.CANNON.children) {
+						if (!pc.checkContact(block.CANNON, child)) {
+							block.CANNON.children.splice(block.CANNON.children.indexOf(child), 1);
+							delete child.parent;
+						} else {
+							let offset = child.position.x - block.position.x;
+							child.position.x = block.CANNON.position.x + offset;
+						}
+					}
+					
 					const q = block.CANNON.quaternion;
 					block.rotation.set(q.x, q.y, q.z);
 					block.position.copy(block.CANNON.position);
 				}
+				
+				// platform
+				
+				var platform = this.platform.CANNON;
+				const input = _controls.offset.x * _controls.speed * 10;
+				if (_controls.offset) {
+					platform.position.x -= input;
+					// if (platform.position.x < -this.dropWidth) {
+					// 	platform.position.x = -this.dropWidth;
+					// } else if (platform.position.x > this.dropWidth) {
+					// 	platform.position.x = this.dropWidth;
+					// }
+					
+					for (let child of platform.children) {
+						if (!pc.checkContact(platform, child)) {
+							platform.children.splice(platform.children.indexOf(child), 1);
+						} else {
+							let offset = child.position.x - this.platform.position.x;
+							child.position.x = platform.position.x + offset;
+						}
+					}
+				}
+				this.platform.position.copy(platform.position);
 				break;
 			default:
 				this.group.rotation.y -= 0.01;
