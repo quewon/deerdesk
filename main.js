@@ -14,7 +14,7 @@ var _loader = new GLTFLoader();
 var _texture_loader = new THREE.TextureLoader();
 var _scene = new THREE.Scene();
 var _preview = new THREE.Scene();
-var _canvas = document.querySelector("canvas");
+var _container = document.getElementById("canvases");
 var _controls = {
 	touch: false,
 	realPos: new THREE.Vector2(),
@@ -140,7 +140,7 @@ function init_3d() {
 	_renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 	_renderer.domElement.classList.add("centered");
 	_renderer.setPixelRatio(window.devicePixelRatio * 2);
-	document.body.appendChild( _renderer.domElement );
+	_container.appendChild( _renderer.domElement );
 	
 	_preview_renderer.outputEncoding = THREE.sRGBEncoding;
 	_preview_renderer.shadowMap.enabled = true;
@@ -173,29 +173,29 @@ function init_3d() {
 
 	// controls
 
-	document.addEventListener("mousedown", function() {
+	_container.addEventListener("mousedown", function() {
 		_controls.touch = true;
 	});
-	document.addEventListener("mousemove", function(e) {
+	_container.addEventListener("mousemove", function(e) {
 		_controls.move(e);
 	});
-	document.addEventListener("touchstart", function(e) {
+	_container.addEventListener("touchstart", function(e) {
 		_controls.touch = true;
 		_controls.move(e);
 	});
-	document.addEventListener("touchmove", function(e) {
+	_container.addEventListener("touchmove", function(e) {
 		_controls.move(e);
 	});
-	document.addEventListener("mouseup", function(e) {
+	_container.addEventListener("mouseup", function(e) {
 		_controls.select(e);
 	});
-	document.addEventListener("touchend", function(e) {
+	_container.addEventListener("touchend", function(e) {
 		_controls.select(e);
 	});
-	document.addEventListener("touchcancel", function(e) {
+	_container.addEventListener("touchcancel", function(e) {
 		_controls.select(e);
 	});
-	document.addEventListener("blur", function(e) {
+	_container.addEventListener("blur", function(e) {
 		_controls.select(e);
 	});
 	window.addEventListener("resize", getSize);
@@ -314,8 +314,6 @@ function getSize() {
 
 	_renderer.setSize( _width, _height );
 	_preview_renderer.setSize(prevsize, prevsize);
-	_canvas.width = _width;
-	_canvas.height = _height;
 }
 
 // SCENES
@@ -641,7 +639,7 @@ var phone = new scene({
 		this.message.canvas.style.marginLeft = 11*scale+"px";
 		this.message.canvas.style.borderRadius = "2em";
 		this.message.canvas.classList.add("centered");
-		document.body.appendChild(this.message.canvas);
+		_container.appendChild(this.message.canvas);
 		this.message.strokeStyle = "white";
 		this.message.lineWidth = 5;
 		this.message.lineCap = "round";
@@ -706,7 +704,7 @@ var phone = new scene({
 		});
 		pool.material.emissive = { r:1, g:1, b:1, isColor: true };
 		
-		const toplight = new THREE.PointLight(0xffffff, 0.5);
+		const toplight = new THREE.PointLight(0x00ffff, 0.5);
 		toplight.position.set(0, 2.1, 0);
 		toplight.lookAt(0, 0, 0);
 		toplight.castShadow = true;
@@ -769,6 +767,7 @@ var phone = new scene({
 			this.pulltime = this.wintime;
 			_controls.lockRotation = false;
 		}
+		this.eraseSpeed = 3;
 	},
 	key: function(obj) {
 		switch (obj) {
@@ -779,9 +778,6 @@ var phone = new scene({
 					}
 					pause("phone");
 				}
-				break;
-			default:
-				game();
 				break;
 		}
 	},
@@ -804,9 +800,9 @@ var phone = new scene({
 				
 				const m = this.message;
 				
-				m.clearRect(0, this.pulltime, m.canvas.width, 1);
+				m.clearRect(0, this.pulltime, m.canvas.width, this.eraseSpeed);
 				if (this.pulltime > -1) {
-					this.pulltime--;
+					this.pulltime -= this.eraseSpeed;
 				}
 				
 				if (_controls.touch) {
@@ -1008,8 +1004,27 @@ var pc = new scene({
 			material: groundmat,
 		});
 		body.addShape(shape);
-		this.world.addBody(body);
+		body.children = [];
+		body.SIZE = platform.SIZE;
+		body.addEventListener("collide", function(e) {
+			if (e.body.position.y > this.position.y) {
+				this.children.push(e.body);
+				console.log(this.children[0]);
+			}
+		});
 		platform.CANNON = body;
+		
+		this.checkContact = function(bodyA, bodyB) {
+			function bodiesAreInContact(bodyA, bodyB) {
+		    for(var i=0; i<world.contacts.length; i++) {
+	        var c = world.contacts[i];
+	        if((c.bi === bodyA && c.bj === bodyB) || (c.bi === bodyB && c.bj === bodyA)) {
+            return true;
+	        }
+		    }
+		    return false;
+			}
+		};
 		
 		// game
 		
@@ -1056,12 +1071,12 @@ var pc = new scene({
 		};
 		
 		this.dropBlock = function(x) {
-			x = x || 0;
+			x = x || Math.ceil(Math.random() * this.dropWidth) * (Math.round(Math.random()) ? 1 : -1);
 			
 			this.createBlock(x);
 			
 			const obj = this.queue.shift();
-			this.group.add(obj);
+			this.gamegroup.add(obj);
 			this.active.push(obj);
 			this.world.addBody(obj.CANNON);
 			
@@ -1069,32 +1084,42 @@ var pc = new scene({
 		};
 		
 		this.platform = platform;
+		this.gamegroup = new THREE.Group();
+		this.group.add(this.gamegroup);
 		
 		this.dropHeight = 50;
+		this.dropWidth = 10;
 		this.threshold = 150;
+		this.ground = 0;
 	},
 	withLoad: function() {
-		_controls.lockRotation = true;
-		_camera.position.set(0, 0, -60);
-		_camera.lookAt(0, 0, 0);
-		_camera.position.y = 20;
-		
 		this.reload = function() {
+			_camera.position.set(0, 0, -60);
+			_camera.lookAt(0, 0, 0);
+			_camera.position.y = 20;
+			_controls.lockRotation = true;
+			
+			this.group.rotation.y = 0;
+			this.platform.CANNON.position.x = 0;
+			
 			this.state = "dropping";
 			this.active = [];
 			this.queue = [];
+			this.group.remove(this.gamegroup);
+			this.gamegroup = new THREE.Group();
+			this.group.add(this.gamegroup);
+			this.world.bodies = [this.platform.CANNON];
+			
+			this.dropBlock();
 		};
 		this.reload();
-		this.dropBlock();
 	},
 	key: function(obj) {
 		switch (obj) {
 			case "deer":
+				this.state = "pause";
 				pause("pc");
-				break;
-			default:
-				game();
-				_controls.lockRotation = true;
+				_controls.lockRotation = false;
 				break;
 		}
 	},
@@ -1104,24 +1129,49 @@ var pc = new scene({
 				var platform = this.platform.CANNON;
 				if (_controls.offset) {
 					platform.position.x -= _controls.offset.x * _controls.speed * 10;
+					if (platform.position.x < -this.dropWidth) {
+						platform.position.x = -this.dropWidth;
+					} else if (platform.position.x > this.dropWidth) {
+						platform.position.x = this.dropWidth;
+					}
 				}
-			
-				// physics affects render
+				
 				this.world.step(0.05);
+				for (let child of platform.children) {
+					if (!pc.checkContact(platform, child)) {
+						platform.children.splice(platform.children.indexOf(child), 1);
+					} else {
+						child.position.x = platform.position.x;
+					}
+				}
+				this.platform.position.copy(platform.position);
+				
 				for (let block of this.active) {
-					block.position.copy(block.CANNON.position);
-					const q = block.CANNON.quaternion;
-					block.rotation.set(q.x, q.y, q.z);
 					if (block.TIME > -1) {
 						block.TIME++;
 						if (block.TIME > this.threshold) {
 							block.TIME = -1;
 							this.dropBlock();
+							
+							var points = Math.floor(this.active.length/2);
+							if (window.player.wins.pc < points) {
+								window.player.wins.pc = points;
+							}
 						}
 					}
+					if (block.CANNON.position.y < this.ground) {
+						this.state = "lose";
+						pause("pc");
+						_controls.lockRotation = false;
+					}
+					
+					const q = block.CANNON.quaternion;
+					block.rotation.set(q.x, q.y, q.z);
+					block.position.copy(block.CANNON.position);
 				}
-				this.platform.position.copy(platform.position);
-				
+				break;
+			default:
+				this.group.rotation.y -= 0.01;
 				break;
 		}
 	}

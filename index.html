@@ -101,6 +101,7 @@
 		#gameintro {
 			z-index: 1;
 			text-align: center;
+			pointer-events: none;
 		}
 		#gameintro span {
 			display: inline-block;
@@ -129,6 +130,7 @@
 			margin-left: 0.5em;
 			margin-right: 0.5em;
 			margin-bottom: 0.5em;
+			pointer-events: auto;
 		}
 		button:active {
 			background: var(--bg);
@@ -164,6 +166,9 @@
 		<br><br>
 		<i>loading...</i>
 	</span>
+	<div id="canvases">
+		
+	</div>
 	<div id="gameintro" class="centered hidden">
 		<span></span>
 		<br>
