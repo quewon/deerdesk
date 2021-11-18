@@ -1215,6 +1215,7 @@ var pc = new scene({
 				this.group.rotation.y -= 0.01;
 				break;
 		}
+		_controls.offset.set(0, 0);
 	}
 });
 var clock = new scene({
