@@ -8,7 +8,7 @@ var HALF_PI = Math.PI / 2;
 var SHADOW_BIAS = -0.0002;
 
 var _width, _height;
-var _renderer, _camera, _raycaster, _composer;
+var _renderer, _camera, _raycaster, _composer, _clock;
 var _preview_renderer, _preview_camera;
 var _loader = new GLTFLoader();
 var _texture_loader = new THREE.TextureLoader();
@@ -23,11 +23,11 @@ var _controls = {
 	offset: new THREE.Vector2(),
 	speedFactor: 2.25,
 	speed: undefined,
-	update: function() {
+	update: function(dt) {
 		if (_controls.offset) {
 			if (_controls.offset.x > 0 || _controls.offset.y > 0) {
-				let offsetX = _controls.offset.x * 0.05;
-				let offsetY = _controls.offset.y * 0.05;
+				let offsetX = _controls.offset.x * dt * 1.5;
+				let offsetY = _controls.offset.y * dt * 1.5;
 
 				if (!_controls.lockRotation) {
 					_current_scene.group.rotation.y += offsetX;
@@ -202,6 +202,9 @@ function init_3d() {
 	document.oncontextmenu = function() {
 		return false;
 	};
+	
+	_clock = new THREE.Clock();
+	_clock.start();
 
 	//
 	
@@ -214,9 +217,11 @@ function init_3d() {
 }
 
 function draw() {
-	_current_scene.update();
-	if (_current_preview) _current_preview.update();
-	_controls.update();
+	const dt = _clock.getDelta();
+	
+	_current_scene.update(dt);
+	if (_current_preview) _current_preview.update(dt);
+	_controls.update(dt);
 
 	// render
 
@@ -505,6 +510,7 @@ var assets = {
 	},
 	images: {
 		"texture": "images/palette.png",
+		"zoom": "images/zoom.png",
 	},
 	sounds: {
 		"alarm": { src: "sounds/alarm.wav", loop: true },
@@ -787,7 +793,7 @@ var phone = new scene({
 				break;
 		}
 	},
-	update: function() {
+	update: function(dt) {
 		const c = this.context;
 		const width = c.canvas.width;
 		const height = c.canvas.height;
@@ -800,9 +806,11 @@ var phone = new scene({
 		
 		// game
 		
+		const bob = this.bobber.point + (Math.sin(this.time * 0.05) * dt * 7);
+		
 		switch (this.state) {
 			case "drawing":
-				this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
+				this.bobber.position.y = bob;
 				
 				const m = this.message;
 				
@@ -844,7 +852,7 @@ var phone = new scene({
 				
 				break;
 			case "idle":
-				this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
+				this.bobber.position.y = bob;
 				
 				const rand = (Math.round(Math.random() * this.chance));
 				if (this.time % rand == 0) {
@@ -854,7 +862,7 @@ var phone = new scene({
 				}
 				break;
 			case "wait":
-				this.bobber.position.y = this.bobber.point + Math.sin(this.time * 0.05)/8;
+				this.bobber.position.y = bob;
 			
 				// c.fillText("낚시찌를 파란 공간", width/2, 50);
 				// c.fillText("안으로 끌어당겨서", width/2, 100);
@@ -871,12 +879,11 @@ var phone = new scene({
 				this.indicator.position.y = 4 + Math.sin(this.time * 0.05 * lvl/2);
 			
 				if (_controls.touch) {
-					this.velocity += 0.005;
+					this.velocity += 0.45;
 				} else {
-					this.velocity -= 0.01;
-					if (this.velocity < -0.2) { this.velocity = -0.2; }
+					this.velocity -= 0.6;
 				}
-				this.bobber.position.y += this.velocity;
+				this.bobber.position.y += this.velocity * dt;
 				
 				if (this.bobber.position.y >= this.indicator.position.y-2 && this.bobber.position.y <= this.indicator.position.y+2) {
 					this.bobber.material.emissive = {r:0, g:1, b:1, isColor: true};
@@ -950,29 +957,27 @@ var pc = new scene({
 		}
 		
 		const platform = this.group.getObjectByName("platform");
-		platform.material = new THREE.MeshPhysicalMaterial({
-			transparent: true,
-			opacity: 1,
-			transmission: 0.5,
-			roughness: 0,
-			specularIntensity: 0.5,
-			ior: 1,
-			reflectivity: 0.5,
-			color: 0x00ffff,
-		});
 		
-		const toplight = new THREE.PointLight(0xffe01c, 0.75);
+		const texture = _texture_loader.load(assets.images.zoom.src);
+		texture.encoding = THREE.sRGBEncoding;
+		texture.flipY = false;
+		platform.material.map = texture;
+		
+		const toplight = new THREE.PointLight(0xffe01c, 0.5);
 		toplight.position.set(0, 70, 0);
 		toplight.lookAt(0, 0, 0);
 		toplight.castShadow = true;
 		toplight.shadow.bias = SHADOW_BIAS;
 		group.add(toplight);
 		
+		group.add(new THREE.AmbientLight(0xffffff, 0.5));
+		
 		// cannon.js initialization
 		
 		var world = new CANNON.World();
 		world.broadphase = new CANNON.NaiveBroadphase();
-		world.gravity.set(0, -9.8/2, 0);
+		world.gravity.set(0, -9.8, 0);
+		this.density = 1000;
 		
 		this.world = world;
 		
@@ -988,7 +993,7 @@ var pc = new scene({
 			platform.SIZE.width/2,
 		));
 		var body = new CANNON.Body({
-			mass: 2515 * shape.volume(),
+			mass: this.density * shape.volume(),
 			type: CANNON.Body.KINEMATIC,
 			position: new CANNON.Vec3(0, platform.position.y, 0),
 		});
@@ -1004,7 +1009,6 @@ var pc = new scene({
 				}
 				
 				this.children.push(e.body);
-				e.body.parent = this;
 			}
 		});
 		platform.CANNON = body;
@@ -1022,11 +1026,11 @@ var pc = new scene({
 		// game
 		
 		this.randomBlocks = [
-			"chair",
-			"pc",
-			"deer",
-			"desk",
-			"clock",
+			"frog",
+			"cat",
+			"bear",
+			"monkey",
+			"snake",
 		];
 		
 		this.createBlock = function(x) {
@@ -1034,36 +1038,28 @@ var pc = new scene({
 				x = Math.ceil(Math.random() * this.dropWidth) * (Math.round(Math.random()) ? 1 : -1);
 			}
 			
-			var width, height, depth;
-			// var height = 1;
-			width = height = depth = platform.SIZE.depth/3;
-			// var depth = 1;
-			var mesh = new THREE.Mesh(
-				new THREE.BoxGeometry(depth, height, width),
-				new THREE.MeshPhysicalMaterial({
-					transparent: true,
-					opacity: 1,
-					transmission: 0.5,
-					roughness: 0,
-					specularIntensity: 0.5,
-					ior: 1,
-					reflectivity: 0.5,
-					color: 0x00ffff,
-					emissive: 0x00ffff,
-					// color: 0x00ffff,
-				}),
-			);
-			mesh.castShadow = true;
-			mesh.receiveShadow = true;
-			var shape = new CANNON.Box(new CANNON.Vec3(depth/2, height/2, width/2));
+			var obj = assets.models[this.randomBlocks[this.randomBlocks.length * Math.random() | 0]];
+			
+			var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
+			mesh.name = name;
+			mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+			mesh.castShadow = obj.castShadow;
+			mesh.receiveShadow = obj.receiveShadow;
+			
+			var box = new THREE.Box3().setFromObject(mesh);
+			var height = box.max.y - box.min.y;
+			var width = box.max.x - box.min.x;
+			var depth = box.max.z - box.min.z;
+			var shape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
+			console.log(depth/2, height/2, width/2);
 			var body = new CANNON.Body({
-				mass: 200 * shape.volume(),
+				mass: this.density * shape.volume(),
 				position: new CANNON.Vec3(x, this.dropHeight, 0),
 			});
 			mesh.position.copy(body.position);
 			body.children = [];
 			body.addEventListener("collide", function(e) {
-				if ((e.body.position.y > this.position.y) && !('parent' in e.body)) {
+				if (e.body.position.y > this.position.y) {
 					for (let child of this.children) {
 						if (child.id == e.body.id) {
 							return;
@@ -1088,8 +1084,6 @@ var pc = new scene({
 			this.gamegroup.add(obj);
 			this.active.push(obj);
 			this.world.addBody(obj.CANNON);
-			
-			console.log("block deployed");
 		};
 		
 		this.platform = platform;
@@ -1099,6 +1093,7 @@ var pc = new scene({
 		this.dropHeight = 50;
 		this.dropWidth = 10;
 		this.threshold = 150;
+		this.platformSpeed = 15;
 		this.ground = 0;
 	},
 	withLoad: function() {
@@ -1133,12 +1128,16 @@ var pc = new scene({
 				break;
 		}
 	},
-	update: function() {
+	update: function(dt) {
 		switch (this.state) {
 			case "dropping":
-				this.world.step(0.05);
+				this.world.step(dt*2);
 				
 				// blocks
+				
+				for (let block of this.active) {
+					block.CANNON.CHANGE = block.CANNON.position.x - block.position.x;
+				}
 				
 				for (let i=this.active.length-1; i>=0; i--) {
 					let block = this.active[i];
@@ -1148,7 +1147,7 @@ var pc = new scene({
 							block.TIME = -1;
 							this.dropBlock();
 							
-							var points = Math.floor(this.active.length/2);
+							var points = Math.floor((this.active.length-1)/2);
 							if (window.player.wins.pc < points) {
 								window.player.wins.pc = points;
 								console.log(this.active.length, points);
@@ -1164,10 +1163,11 @@ var pc = new scene({
 					for (let child of block.CANNON.children) {
 						if (!pc.checkContact(block.CANNON, child)) {
 							block.CANNON.children.splice(block.CANNON.children.indexOf(child), 1);
-							delete child.parent;
 						} else {
 							let offset = child.position.x - block.position.x;
-							child.position.x = block.CANNON.position.x + offset;
+							// child.position.x = block.CANNON.position.x + offset;
+							child.position.x += block.CANNON.CHANGE;
+							console.log(block.CANNON.position.x + offset);
 						}
 					}
 					
@@ -1179,15 +1179,9 @@ var pc = new scene({
 				// platform
 				
 				var platform = this.platform.CANNON;
-				const input = _controls.offset.x * _controls.speed * 10;
+				const input = _controls.offset.x * _controls.speed * this.platformSpeed;
 				if (_controls.offset) {
 					platform.position.x -= input;
-					// if (platform.position.x < -this.dropWidth) {
-					// 	platform.position.x = -this.dropWidth;
-					// } else if (platform.position.x > this.dropWidth) {
-					// 	platform.position.x = this.dropWidth;
-					// }
-					
 					for (let child of platform.children) {
 						if (!pc.checkContact(platform, child)) {
 							platform.children.splice(platform.children.indexOf(child), 1);
@@ -1214,8 +1208,6 @@ var clock = new scene({
 			"desk",
 			"keyboar",
 			"mouse",
-			
-			"floor",
 			
 			"computer_plug",
 			"pc",
