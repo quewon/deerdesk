@@ -507,6 +507,7 @@ var assets = {
 		"bedroom": "models/bedroom.glb",
 		"phone": "models/phone.glb",
 		"pc": "models/pc.glb",
+		"clock": "models/clock.glb",
 	},
 	images: {
 		"texture": "images/palette.png",
@@ -1213,21 +1214,171 @@ var clock = new scene({
 			"pc",
 			"pc_screen",
 			
-			"deer"
+			"deer",
+			
+			"big_clock",
+			"big_clock_lines",
+			"clock_canvas",
 		];
 		
 		this.loadFromList(load);
 		
 		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
-		toplight.position.set(0, 13, 0);
+		toplight.position.set(0, 50, 0);
 		toplight.lookAt(0, 0, 0);
 		toplight.castShadow = true;
 		toplight.shadow.bias = SHADOW_BIAS;
 		group.add(toplight);
+		
+		const deer = group.getObjectByName("deer");
+		const move = ["chair", "desk", "keyboar", "mouse", "computer_plug", "pc", "pc_screen", "deer"];
+		for (let name of move) {
+			var obj = group.getObjectByName(name);
+			obj.position.z -= deer.position.z;
+		}
+		
+		var canvas = group.getObjectByName("clock_canvas");
+		canvas.receiveShadow = false;
+		canvas.castShadow = false;
+		canvas.material.transparent = true;
+		
+		var box = new THREE.Box3().setFromObject(canvas);
+		var width = box.max.z - box.min.z;
+		
+		this.context = document.createElement("canvas").getContext("2d");
+		this.texture = new THREE.CanvasTexture(this.context.canvas);
+		canvas.material.map = this.texture;
+		this.context.canvas.width = this.context.canvas.height = width * 100;
+		this.context.lineWidth = 50;
+		
+		this.THIRTIETH = Math.PI/30;
+		
+		this.drawClock = function(time) {
+			const c = this.context;
+			const width = this.context.canvas.width;
+			
+			c.setTransform(-1, 0, 0, 1, width/2, width/2);
+			c.clearRect(-width/2, -width/2, width*2, width*2);
+			
+			c.strokeStyle = "#00ffff";
+			
+			var minute = Math.PI / 4 + (this.THIRTIETH * time);
+			
+			c.beginPath();
+			c.moveTo(0, 0);
+			var cos = Math.cos(minute);
+			var sin = Math.sin(minute);
+			var scale = width * 0.2;
+			c.lineTo((cos-sin) * scale, (sin+cos) * scale);
+			c.stroke();
+			
+			var hour = Math.PI / 4 + (this.THIRTIETH * (time/12));
+			
+			c.beginPath();
+			c.moveTo(0, 0);
+			var cos = Math.cos(hour);
+			var sin = Math.sin(hour);
+			var scale = width * 0.1;
+			c.lineTo((cos-sin) * scale, (sin+cos) * scale);
+			c.stroke();
+			
+			this.texture.needsUpdate = true;
+		};
+		
+		this.history = [];
+		this.stateData = {
+			work: {
+				color: "#f8de65", // yellow
+			},
+			play: {
+				color: "#e394b7", // pink
+			},
+			sleep: {
+				color: "#3671b6", // blue
+			},
+		};
+		this.changeState = function(state) {
+			this.focus = 1;
+			this.state = state;
+			
+			this.history.push({
+				color: this.stateData[state].color,
+				origin: Math.PI/2 + (this.THIRTIETH * (this.time%720)/12),
+				end: undefined,
+			});
+		};
+		
+		this.drawState = function(time) {
+			const c = this.context;
+			const width = this.context.canvas.width;
+			
+			switch (this.state) {
+				case "work":
+					break;
+				case "play":
+					break;
+				case "sleep":
+					break;
+			}
+			
+			this.history[this.history.length-1].end = Math.PI/2 + (this.THIRTIETH * (time%720)/12);
+			
+			for (let arc of this.history) {
+				c.strokeStyle = arc.color;
+				c.beginPath();
+				c.arc(0, 0, width*0.45, arc.origin, arc.end);
+				c.stroke();
+			}
+		};
+		
+		//
+		
+		this.minSpeed = 5;
+		this.maxSpeed = 100;
+	},
+	withLoad: function() {
+		_camera.position.set(0, 50, 0);
+		_camera.lookAt(0, 0, 0);
+		_controls.lockRotation = true;
+		
+		this.time = 0;
+		this.focus = 1;
+		this.speed = this.minSpeed;
+		this.changeState("play");
 	},
 	key: function(obj) {
 		switch (obj) {
+			case "deer":
+				this.state = "pause";
+				pause("clock");
+				_controls.lockRotation = false;
+				break;
+		}
+	},
+	update: function(dt) {
+		this.drawClock(this.time);
+		this.drawState(this.time);
+		
+		if (this.state != "pause") {
+			this.speed *= 0.85;
+			if (this.speed < this.minSpeed) { this.speed = this.minSpeed }
+			this.focus += dt * 1.25;
+			this.speed += this.focus;
+			if (this.speed > this.maxSpeed) { this.speed = this.maxSpeed }
 			
+			if (Math.random() > 0.99) {
+				this.changeState(["work", "play", "sleep"][Math.random() * 3 | 0]);
+			}
+			
+			var newangle = (this.THIRTIETH * ((this.time + dt * this.speed)%720)/12);
+			var timeangle = (this.THIRTIETH * (this.time%720)/12);
+			this.time += dt * this.speed;
+			
+			if (newangle <= 1 && timeangle >= 3) {
+				this.time = Math.PI * 24 / this.THIRTIETH;
+				console.log("day over");
+				this.state = "pause";
+			}
 		}
 	}
 });
