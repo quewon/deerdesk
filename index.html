@@ -166,6 +166,26 @@
 			color: white;
 			opacity: 0.6;
 		}
+		
+		.clock {
+			background: var(--bg);
+			border-radius: 1em;
+			padding: 1em;
+			opacity: 0.75;
+			margin-top: -5em;
+		}
+		
+		.clock div {
+			margin-bottom: 1em;
+			width: fit-content;
+		}
+		
+		.clock div button:last-child {
+			/* border: 0.25em solid var(--light-bg); */
+			margin-top: 1em;
+			/* font-size: 0.9em;
+			background: transparent; */
+		}
 	</style>
 </head>
 <body>
@@ -187,19 +207,22 @@
 		<br>
 		<button>시작하기</button>
 		<button id="message_made" class="hidden">쪽지 그리고 시작하기</button>
+		<button id="return" class="hidden">게임 재생</button>
 	</div>
 	
-	<div id="drawing_menu" class="centered hidden" style="pointer-events: none;">
-		남들을 위한 쪽지를 그려<br>
-		그걸 미끼로 삼았다
+	<div id="gameui">
+		<div id="drawing_menu" class="centered hidden" style="pointer-events: none;">
+			남들을 위한 쪽지를 그려<br>
+			그걸 미끼로 삼았다
+		</div>
 	</div>
 
 </body>
 
-<script src="lib/three.js"></script>
-<script src="lib/cannon.js"></script>
-<script src="lib/howler.js"></script>
-<script type="module" src="main.js"></script>
+<script src="lib/three.js" type="text/javascript"></script>
+<script src="lib/cannon.js" type="text/javascript"></script>
+<script src="lib/howler.js" type="text/javascript"></script>
+<script type="module" src="lib/main.js" type="text/javascript"></script>
 <script>
 	var player = {
 		wins: {

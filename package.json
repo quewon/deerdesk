@@ -1,0 +1,28 @@
+{
+  "name": "deerdesk",
+  "version": "1.0.0",
+  "description": "game",
+  "main": "app.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quewon/deerdesk.git"
+  },
+  "keywords": [
+    "game"
+  ],
+  "author": "q1",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/quewon/deerdesk/issues"
+  },
+  "homepage": "https://github.com/quewon/deerdesk#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
