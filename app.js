@@ -15,15 +15,24 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname+'/index.html');
 });
 
+var imgs = [];
+
 // https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon
 
 io.on('connection', (socket) => {
   console.log('user connected!');
 
-  socket.on('greet', (data) => {
-    console.log(data);
-    socket.emit('respond', { message: 'sup, client.' });
+  socket.on('imgdrawn', (data) => {
+    console.log('image received!');
+    imgs.push(data.src);
+    socket.emit('img', { array: imgs });
   });
+  
+  socket.on('imgrequest', (data) => {
+    console.log('image requested');
+    socket.emit('img', { array: imgs });
+  });
+  
   socket.on('disconnect', function() {
     console.log('user disconnected.');
   });
