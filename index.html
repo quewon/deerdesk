@@ -239,7 +239,8 @@
 	
 	// https://stackoverflow.com/questions/19426882/node-js-socket-io-socket-io-js-not-found/22218615
 	
-	var socket = io('http://deerdesk.azurewebsites.net', {transports: ['websocket']});
+	var socket = io('ws://deerdesk.azurewebsites.net', { transports: ['websocket'] });
+	// socket = io('ws://localhost:3000', { transports: ['websocket'] });
 	socket.on('connect', function() {
 	  console.log('CONNECTED TO SERVER.');
 	});

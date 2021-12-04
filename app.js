@@ -39,6 +39,6 @@ io.on('connection', (socket) => {
 
 const port = process.env.port || 3000;
 server.listen(port, function() {
-  var addr = app.address();
+  var addr = server.address();
   console.log('app listening on http://' + addr.address + ':' + addr.port);
 });
