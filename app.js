@@ -29,7 +29,6 @@ io.on('connection', (socket) => {
   });
   
   socket.on('imgrequest', (data) => {
-    console.log('image requested');
     socket.emit('img', { array: imgs });
   });
   

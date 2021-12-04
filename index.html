@@ -247,19 +247,27 @@
 	socket.on('img', (data) => {
 		imgs = data.array;
 		
-		let todel = [];
-		for (let i=0; i<imgs.length; i++) {
-			for (let img of player.messages) {
-				if (imgs[i] == img) {
-					todel.push(i);
-					break;
-				}
-			}
-		}
+		// let todel = [];
+		// for (let i=0; i<imgs.length; i++) {
+		// 	for (let img of player.messages) {
+		// 		if (imgs[i] == img) {
+		// 			todel.push(i);
+		// 			break;
+		// 		}
+		// 	}
+		// }
+		// 
+		// for (let i=todel.length-1; i>=0; i--) {
+		// 	imgs.splice(i, 1);
+		// }
 		
-		for (let i=todel.length-1; i>=0; i--) {
-			imgs.splice(i, 1);
+		var r = [];
+		for (let img of imgs) {
+			var i = document.createElement("img");
+			i.src = img;
+			r.push(i);
 		}
+		imgs = r;
 		
 		console.log(imgs);
 	});
