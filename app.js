@@ -7,10 +7,10 @@ const { Server } = require('socket.io');
 const io = new Server(server, { /* options */ });
 
 app.use(express.static('public'));
-app.use('/lib/', express.static('lib'));
-app.use('/public/models/', express.static('models'));
-app.use('/public/images/', express.static('images'));
-app.use('/public/sounds/', express.static('sounds'));
+app.use('/public/lib/', express.static('lib'));
+app.use('/models/', express.static('models'));
+app.use('/images/', express.static('images'));
+app.use('/sounds/', express.static('sounds'));
 // app.use('/node_modules/', express.static('node_modules'));
 
 app.get('/', (req, res) => {
