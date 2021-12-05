@@ -7,8 +7,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "true",
-    "build": "node app.js"
+    "test": "true"
   },
   "repository": {
     "type": "git",
