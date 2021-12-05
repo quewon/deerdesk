@@ -7,7 +7,7 @@ const { Server } = require('socket.io');
 const io = new Server(server, { /* options */ });
 
 app.use(express.static('public'));
-app.use('/public/lib/', express.static('lib'));
+app.use('/lib/', express.static('lib'));
 app.use('/models/', express.static('models'));
 app.use('/images/', express.static('images'));
 app.use('/sounds/', express.static('sounds'));
