@@ -8,9 +8,9 @@ const io = new Server(server, { /* options */ });
 
 app.use(express.static('public'));
 app.use('/lib/', express.static('lib'));
-app.use('/models/', express.static('models'));
-app.use('/images/', express.static('images'));
-app.use('/sounds/', express.static('sounds'));
+app.use('/public/models/', express.static('models'));
+app.use('/public/images/', express.static('images'));
+app.use('/public/sounds/', express.static('sounds'));
 // app.use('/node_modules/', express.static('node_modules'));
 
 app.get('/', (req, res) => {
@@ -18,6 +18,7 @@ app.get('/', (req, res) => {
 });
 
 var imgs = [];
+var scores = {};
 
 // https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon
 
@@ -28,6 +29,10 @@ io.on('connection', (socket) => {
     console.log('image received!');
     imgs.push(data.src);
     socket.emit('img', { array: imgs });
+  });
+  
+  socket.on('datarequest', function() {
+    socket.emit('datasend', { imgs: imgs, scores: scores })
   });
   
   socket.on('imgrequest', (data) => {
