@@ -25,6 +25,7 @@ jobs:
         run: |
           npm install
           npm install -g mocha --save-dev
+          npm install socket.io
           npm run build --if-present
           npm run test --if-present
       
