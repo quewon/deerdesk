@@ -186,6 +186,7 @@ function init_3d() {
 		_controls.move(e);
 	});
 	_container.addEventListener("touchmove", function(e) {
+		e.preventDefault();
 		_controls.move(e);
 	});
 	_container.addEventListener("mouseup", function(e) {
