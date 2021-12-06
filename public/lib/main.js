@@ -3,6 +3,7 @@ import {EffectComposer} from "./EffectComposer.js";
 import {RenderPass} from "./RenderPass.js";
 import {UnrealBloomPass} from "./UnrealBloomPass.js";
 import {BokehPass} from './BokehPass.js';
+import {CSS2DRenderer, CSS2DObject} from './CSS2DRenderer.js';
 
 var HALF_PI = Math.PI / 2;
 var SHADOW_BIAS = -0.0002;
@@ -11,6 +12,7 @@ var GAMEINTRO = document.getElementById("gameintro");
 
 var _width, _height;
 var _renderer, _camera, _raycaster, _composer, _clock;
+var _label;
 var _preview_renderer, _preview_camera;
 var _loader = new GLTFLoader();
 var _texture_loader = new THREE.TextureLoader();
@@ -124,6 +126,7 @@ function init() {
 function init_3d() {
 	_renderer = new THREE.WebGLRenderer({ alpha: true });
 	_preview_renderer = new THREE.WebGLRenderer({ alpha: true });
+	_label = new CSS2DRenderer();
 	_renderer.setClearColor( 0x384636, 0 );
 	_preview_renderer.setClearColor( 0x384636, 0 );
 	
@@ -150,6 +153,9 @@ function init_3d() {
 	_preview_renderer.setPixelRatio(window.devicePixelRatio * 2);
 	const intro = document.getElementById("gameintro");
 	intro.replaceChild(_preview_renderer.domElement, intro.querySelector("canvas"));
+	
+	_label.domElement.classList.add("centered");
+	_container.appendChild(_label.domElement);
 	
 	// _composer = new EffectComposer(_renderer);
 	// _composer.addPass(new RenderPass(_scene, _camera));
@@ -231,6 +237,7 @@ function draw() {
 	_renderer.render(_scene, _camera);
 	// _composer.render();
 	_preview_renderer.render(_preview, _preview_camera);
+	_label.render(_scene, _camera);
 
 	requestAnimationFrame(draw);
 }
@@ -323,6 +330,7 @@ function getSize() {
   _preview_camera.updateProjectionMatrix();
 
 	_renderer.setSize( _width, _height );
+	_label.setSize( _width, _height );
 	_preview_renderer.setSize(prevsize, prevsize);
 }
 
@@ -348,6 +356,8 @@ class scene {
 		this.withLoad = p.withLoad || function(){};
 		this.withUnload = p.withUnload || function(){};
 
+		this.css2d = [];
+
 		ref.push(this);
 	}
 
@@ -360,6 +370,10 @@ class scene {
 		}
 		
 		if (_current_scene) {
+			for (let label of _current_scene.css2d) {
+				label.parent.remove(label);
+			}
+			_current_scene.css2d = [];
 			_current_scene.withUnload();
 			_current_scene.group.visible = false;
 		}
@@ -383,6 +397,20 @@ class scene {
 			mesh.castShadow = obj.castShadow;
 			mesh.receiveShadow = obj.receiveShadow;
 			this.group.add(mesh);
+		}
+	}
+	
+	loadLabels(labels) {
+		for (let label of labels) {
+			let div = document.createElement("div");
+			div.className = "label";
+			div.textContent = label.text;
+			let obj = new CSS2DObject(div);
+			const object = this.group.getObjectByName(label.obj);
+			obj.position.set(0, 1 / object.scale.y, 0);
+			object.add(obj);
+			
+			this.css2d.push(obj);
 		}
 	}
 }
@@ -427,8 +455,8 @@ class preview extends scene {
 	}
 }
 
-function pause(name) {
-	game("pause");
+function pause(name, score) {
+	game("pause", score);
 	const button = document.querySelector("#gameintro button");
 	button.onclick = button.ontouchend = function() {
 		bedroom.load();
@@ -444,11 +472,14 @@ function unpause() {
 	GAMEUI.classList.remove("hidden");
 }
 
-function game(name) {
+function setScore(name, score) {
+	window.player.wins[name] = score;
+	console.log({ game: name, username: window.player.username, score: score });
+	window.socket.emit('setscore', { game: name, username: window.player.username, score: score });
+}
+
+function game(name, score) {
 	_controls.touch = false;
-	
-	const lf = "◍";
-	const le = "◌";
 	
 	if (name) {
 		const game = games[name];
@@ -462,34 +493,42 @@ function game(name) {
 		span.innerHTML = game.title;
 		
 		levels.textContent = "";
-		for (let i=1; i<=5; i++) {
-			if (i <= window.player.wins[name]) {
-				levels.textContent += lf+" ";
-			} else {
-				levels.textContent += le+" ";
+		if (score) {
+			levels.textContent = "점수: "+score;
+		} else {
+			const lf = "◍";
+			const le = "◌";
+			for (let i=1; i<=5; i++) {
+				if (i <= window.player.wins[name]) {
+					levels.textContent += lf+" ";
+				} else {
+					levels.textContent += le+" ";
+				}
 			}
 		}
 		
 		game.preview.load();
 		_controls.lockRotation = true;
 		
-		levels.classList.remove("hidden");
+		// levels.classList.remove("hidden");
 		button.textContent = "시작하기";
 		
 		if (name == "pause") {
 			GAMEUI.classList.add("hidden");
 			button.textContent = "방으로 돌아가기";
 			button2.classList.remove("hidden");
-			levels.classList.add("hidden");
+			// levels.classList.add("hidden");
 		} else {
 			button.onclick = button.ontouchend = function() { games[name].load(); };
 			button2.classList.add("hidden");
 		}
 		
-		if (name == "phone" && window.player.messages.length > 0) {
-			phone.message_made.classList.remove("hidden");
-		} else {
-			phone.message_made.classList.add("hidden");
+		if ('message_made' in phone) {
+			if (name == "phone" && window.player.messages.length > 0) {
+				phone.message_made.classList.remove("hidden");
+			} else {
+				phone.message_made.classList.add("hidden");
+			}
 		}
 	} else {
 		GAMEINTRO.classList.add("hidden");
@@ -498,7 +537,8 @@ function game(name) {
 }
 
 function init_scenes() {
-	bedroom.load();
+	// bedroom.load();
+	guestentry.load();
 	
 	console.log("all scenes loaded.");
 }
@@ -519,10 +559,47 @@ var assets = {
 		"alarm": { src: "sounds/alarm.wav", loop: true },
 	},
 };
-var bedroom = new scene({
-	music: "alarm",
+var guestentry = new scene({
 	init: function(group) {
-		const load = [
+		this.ui = document.createElement("div");
+		this.ui.id = "guestentry";
+		// this.ui.classList.add("selectable");
+		this.ui.innerHTML = "게스트북에 이름을 적어주시겠습니까?<br><br>이름: ";
+		let input = document.createElement("input");
+		input.type = "text";
+		input.autofocus = true;
+		this.ui.appendChild(input);
+		this.ui.innerHTML += "<br><br>";
+		let ybutton = document.createElement("button");
+		ybutton.textContent = "✔";
+		ybutton.onclick = ybutton.ontouchend = function() {
+			let g = guestentry.ui.querySelector("input").value.trim();
+			console.log(g);
+			if (g != "") {
+				window.socket.emit('guestbook', g);
+				window.player.username = g;
+				bedroom.load();
+			};
+		};
+		let nbutton = document.createElement("button");
+		nbutton.textContent = "건너뛰기";
+		nbutton.onclick = nbutton.ontouchend = function() { bedroom.load(); };
+		this.ui.appendChild(ybutton);
+		this.ui.appendChild(nbutton);
+		GAMEUI.appendChild(this.ui);
+		this.ui.classList.add("hidden");
+	},
+	withLoad: function() {
+		this.ui.classList.remove("hidden");
+	},
+	withUnload: function() {
+		this.ui.classList.add("hidden");
+	},
+	key: function() { },
+});
+var bedroom = new scene({
+	init: function(group) {
+		this.loadFromList([
 			"floor",
 			
 			"3",
@@ -544,6 +621,9 @@ var bedroom = new scene({
 			"keyboar",
 			"mouse",
 			
+			"guestbook",
+			"pencil",
+			
 			"computer_plug",
 			"pc",
 			"pc_screen",
@@ -557,9 +637,7 @@ var bedroom = new scene({
 			"curtain_lever",
 			
 			"deer"
-		];
-		
-		this.loadFromList(load);
+		]);
 		
 		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
 		toplight.position.set(0, 13, 0);
@@ -576,7 +654,23 @@ var bedroom = new scene({
 		_camera.lookAt(0, 0, 0);
 		_camera.position.y = 15;
 		GAMEUI.classList.add("hidden");
+		
+		this.loadLabels([
+			{
+				obj: "phone_case",
+				text: "v"
+			},
+			{
+				obj: "pc",
+				text: "v"
+			},
+			{
+				obj: "guestbook",
+				text: "v"
+			}
+		]);
 	},
+	keys: ["phone_case", "phone_screen", "pc", "pc_screen", "guestbook"],
 	key: function(obj) {
 		switch (obj) {
 			case "phone_case":
@@ -594,9 +688,8 @@ var bedroom = new scene({
 	}
 });
 var phone = new scene({
-	music: "alarm",
 	init: function(group) {
-		const load = [
+		this.loadFromList([
 			"bobber",
 			"fishing_phone",
 			"pool",
@@ -605,9 +698,7 @@ var phone = new scene({
 			"screen_back",
 			
 			"deer"
-		];
-		
-		this.loadFromList(load);
+		]);
 		
 		const deer = this.group.getObjectByName("deer");
 		deer.position.set(-9.25, 5.25745, -2.55082);
@@ -781,6 +872,13 @@ var phone = new scene({
 		}
 	},
 	withLoad: function() {
+		this.loadLabels([
+			{
+				obj: "deer",
+				text: "←"
+			}
+		]);
+		
 		this.level = 0;
 		this.ui.classList.add("hidden");
 		this.message.clearRect(0, 0, this.message.canvas.width, this.message.canvas.height);
@@ -809,12 +907,13 @@ var phone = new scene({
 		this.ui.classList.add("hidden");
 		this.message.canvas.classList.add("hidden");
 	},
+	keys: ["deer"],
 	key: function(obj) {
 		switch (obj) {
 			case "deer":
 				if (this.state != "pull" && this.state != "wait") {
 					if (this.level > window.player.wins.phone) {
-						window.player.wins.phone = this.level;
+						setScore("phone", this.level);
 					}
 					pause("phone");
 				}
@@ -982,18 +1081,20 @@ var phone = new scene({
 					
 					if (this.bobber.position.y <= -10 || this.bobber.position.y > 9.44335) {
 						this.state = "lose";
+						this.velocity = 0;
 						this.indicator.visible = false;
 						this.bobber.material.emissive = {r:0, g:1, b:1, isColor: true};
 						if (this.level > window.player.wins.phone) {
-							window.player.wins.phone = this.level;
+							setScore("phone", this.level);
 						}
-						pause("phone");
+						pause("phone", this.level);
 						_controls.lockRotation = false;
 						window.socket.emit('imgrequest');
 					}
 				}
 				break;
 			case "win":
+				this.velocity = 0;
 				this.state = "idle";
 				break;
 		}
@@ -1004,7 +1105,7 @@ var phone = new scene({
 var pc = new scene({
 	music: "alarm",
 	init: function(group) {
-		const load = [
+		this.loadFromList([
 			"floor",
 			
 			"chair",
@@ -1018,9 +1119,14 @@ var pc = new scene({
 			"deer",
 			
 			"platform",
-		];
+		]);
 		
-		this.loadFromList(load);
+		this.loadLabels([
+			{
+				obj: "deer",
+				text: "←"
+			}
+		]);
 		
 		const desk = this.group.getObjectByName("desk");
 		const moveWithDesk = ["chair", "keyboar", "mouse", "pc", "pc_screen", "deer", "desk"];
@@ -1170,6 +1276,13 @@ var pc = new scene({
 		this.ground = 0;
 	},
 	withLoad: function() {
+		this.loadLabels([
+			{
+				obj: "deer",
+				text: "←"
+			}
+		]);
+		
 		this.reload = function() {
 			_camera.position.set(0, 0, -60);
 			_camera.lookAt(0, 0, 0);
@@ -1192,6 +1305,7 @@ var pc = new scene({
 		};
 		this.reload();
 	},
+	keys: ["deer"],
 	key: function(obj) {
 		switch (obj) {
 			case "deer":
@@ -1234,15 +1348,15 @@ var pc = new scene({
 							block.TIME = -1;
 							this.dropBlock();
 							
-							var points = Math.floor((this.active.length-1)/2);
+							var points = this.active.length-1;
 							if (window.player.wins.pc < points) {
-								window.player.wins.pc = points;
+								setScore("pc", points);
 							}
 						}
 					}
 					if (block.CANNON.position.y < this.ground) {
 						this.state = "lose";
-						pause("pc");
+						pause("pc", this.active.length-1);
 						_controls.lockRotation = false;
 					}
 					

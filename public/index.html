@@ -28,6 +28,25 @@
 	                                  supported by Chrome, Edge, Opera and Firefox */
 			outline: none;
 		}
+		
+		input[type="text"] {
+			-webkit-touch-callout: unset !important; /* iOS Safari */
+	    -webkit-user-select: auto !important; /* Safari */
+	     -khtml-user-select: unset !important; /* Konqueror HTML */
+	       -moz-user-select: unset !important; /* Old versions of Firefox */
+	        -ms-user-select: unset !important; /* Internet Explorer/Edge */
+	            user-select: auto !important; /* Non-prefixed version, currently
+	                                  supported by Chrome, Edge, Opera and Firefox */
+																		
+			border: none;
+			border-bottom: 1px solid var(--light-bg);
+			background: transparent;
+			font-family: inherit;
+			font-size: inherit;
+			color: inherit;
+			overflow: visible;
+			margin: 0;
+		}
 
 		html {
 			overflow: hidden;
@@ -187,6 +206,20 @@
 			/* font-size: 0.9em;
 			background: transparent; */
 		}
+		
+		#gameui {
+			z-index: 10;
+		}
+		
+		#guestentry button {
+			background: transparent;
+			border: 1px solid var(--light);
+			width: fit-content;
+			min-width: 2.5em;
+		}
+		#guestentry button:active {
+			border-color: var(--light-bg);
+		}
 	</style>
 </head>
 <body>
@@ -197,7 +230,15 @@
 		<br><br>
 		<i>loading...</i>
 	</span>
+	
 	<div id="canvases" class="centered">
+		
+	<div id="gameui" class="centered">
+		<div id="drawing_menu" class="hidden" style="pointer-events: none;">
+			남들을 위한 쪽지를 그려<br>
+			그걸 미끼로 삼았다
+		</div>
+	</div>
 		
 	</div>
 	<div id="gameintro" class="centered hidden">
@@ -209,13 +250,6 @@
 		<button>시작하기</button>
 		<button id="message_made" class="hidden">쪽지 그리고 시작하기</button>
 		<button id="return" class="hidden">게임 재생</button>
-	</div>
-	
-	<div id="gameui">
-		<div id="drawing_menu" class="centered hidden" style="pointer-events: none;">
-			남들을 위한 쪽지를 그려<br>
-			그걸 미끼로 삼았다
-		</div>
 	</div>
 
 </body>
@@ -232,11 +266,13 @@
 			clock: 0,
 			pc: 0,
 		},
-		username: "",
+		username: "익명",
 		messages: [],
 	};
 	
 	var imgs = [];
+	var guestbook = [];
+	var scores = {};
 	
 	// https://stackoverflow.com/questions/19426882/node-js-socket-io-socket-io-js-not-found/22218615
 	
@@ -244,12 +280,23 @@
 	// var socket = io('ws://deerdesk.azurewebsites.net', { transports: ['websocket'] });
 	// var socket = io('ws://localhost:3000', { transports: ['websocket'] });
 	
+	function writeData(data) {
+		socket.emit('datawrite', data);
+	}
+	
 	function sendData() {
 		socket.emit('datarequest');
 	}
-	
 	socket.on('datasend', function(data) {
 		console.log(data);
+	});
+	socket.on('getscore', (data) => {
+		scores.pc = data.pc;
+		scores.phone = data.phone;
+	});
+	
+	socket.on('guestbookupdate', function(data) {
+		guestbook = data.array;
 	});
 	
 	socket.on('connect', function() {
@@ -280,8 +327,6 @@
 			r.push(i);
 		}
 		imgs = r;
-		
-		console.log(imgs);
 	});
 	
 	socket.on('disconnect', function() {

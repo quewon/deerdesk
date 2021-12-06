@@ -18,29 +18,52 @@ app.get('/', (req, res) => {
 });
 
 var imgs = [];
-var scores = {};
+var guestbook = [];
+var scores = {
+  pc: [],
+  phone: [],
+};
 
 // https://stackoverflow.com/questions/41381444/websocket-connection-failed-error-during-websocket-handshake-unexpected-respon
 
 io.on('connection', (socket) => {
-  console.log('user connected!');
+  console.log('user connected');
 
   socket.on('imgdrawn', (data) => {
-    console.log('image received!');
+    console.log('  image received');
     imgs.push(data.src);
     socket.emit('img', { array: imgs });
   });
   
   socket.on('datarequest', function() {
-    socket.emit('datasend', { imgs: imgs, scores: scores })
+    socket.emit('datasend', { imgs: imgs, scores: scores, guestbook: guestbook })
+  });
+  socket.on('datawrite', (data) => {
+    imgs = data.imgs;
+    scores = data.scores;
+    guestbook = data.guestbook;
+  });
+  
+  socket.on('setscore', (data) => {
+    console.log('  '+data.game+': score of '+data.score+' received from '+data.username);
+    scores[data.game].push({
+      username: data.username,
+      score: data.score,
+    });
+    socket.emit('getscore', { pc: scores.pc, phone: scores.phone });
   });
   
   socket.on('imgrequest', (data) => {
     socket.emit('img', { array: imgs });
   });
   
+  socket.on('guestbook', (data) => {
+    guestbook.push(data);
+    socket.emit('guestbookupdate', { array: guestbook });
+  });
+  
   socket.on('disconnect', function() {
-    console.log('user disconnected.');
+    console.log('user disconnected');
   });
 });
 
