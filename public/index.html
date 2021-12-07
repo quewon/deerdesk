@@ -220,6 +220,20 @@
 		#guestentry button:active {
 			border-color: var(--light-bg);
 		}
+		
+		.label {
+			animation: bob 1s ease-in-out infinite;
+			pointer-events: none;
+		}
+		
+		@keyframes bob {
+		  0%, 100% {
+				padding-top: 0;
+		  }
+		  50% {
+				padding-top: 10px;
+		  }
+		}
 	</style>
 </head>
 <body>

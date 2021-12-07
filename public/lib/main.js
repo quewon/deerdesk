@@ -9,6 +9,7 @@ var HALF_PI = Math.PI / 2;
 var SHADOW_BIAS = -0.0002;
 var GAMEUI = document.getElementById("gameui");
 var GAMEINTRO = document.getElementById("gameintro");
+var PAUSE = "II";
 
 var _width, _height;
 var _renderer, _camera, _raycaster, _composer, _clock;
@@ -188,6 +189,7 @@ function init_3d() {
 		_controls.move(e);
 	});
 	_container.addEventListener("touchstart", function(e) {
+		e.preventDefault();
 		_controls.touch = true;
 		_controls.move(e);
 	});
@@ -460,10 +462,12 @@ function pause(name, score) {
 	const button = document.querySelector("#gameintro button");
 	button.onclick = button.ontouchend = function() {
 		bedroom.load();
+		play("click");
 	};
 	let button2 = GAMEINTRO.querySelector("#return");
 	button2.onclick = button2.ontouchend = function() {
 		_current_scene.key("unpause");
+		play("click");
 	};
 }
 
@@ -482,6 +486,7 @@ function game(name, score) {
 	_controls.touch = false;
 	
 	if (name) {
+		if (!score && isNaN(score)) play("click");
 		const game = games[name];
 		GAMEINTRO.classList.remove("hidden");
 		
@@ -519,7 +524,7 @@ function game(name, score) {
 			button2.classList.remove("hidden");
 			// levels.classList.add("hidden");
 		} else {
-			button.onclick = button.ontouchend = function() { games[name].load(); };
+			button.onclick = button.ontouchend = function() { games[name].load(); play("click"); };
 			button2.classList.add("hidden");
 		}
 		
@@ -537,7 +542,6 @@ function game(name, score) {
 }
 
 function init_scenes() {
-	// bedroom.load();
 	guestentry.load();
 	
 	console.log("all scenes loaded.");
@@ -556,36 +560,62 @@ var assets = {
 		"zoom": "images/zoom.png",
 	},
 	sounds: {
-		"alarm": { src: "sounds/alarm.wav", loop: true },
+		"startup": { src: "sounds/startup.wav", loop: false },
+		"type/1": { src: "sounds/type/1.wav", loop: false },
+		"type/2": { src: "sounds/type/2.wav", loop: false },
+		"type/3": { src: "sounds/type/3.wav", loop: false },
+		"click": { src: "sounds/click.wav", loop: false },
+		"eraser": { src: "sounds/wiper.wav", loop: false },
+		"bedroom": { src: "sounds/midnight.wav", loop: true },
 	},
 };
+
+function play(sound) {
+	assets.sounds[sound].play();
+}
+function stop(sound) {
+	assets.sounds[sound].pause();
+}
+
 var guestentry = new scene({
 	init: function(group) {
 		this.ui = document.createElement("div");
 		this.ui.id = "guestentry";
-		// this.ui.classList.add("selectable");
-		this.ui.innerHTML = "게스트북에 이름을 적어주시겠습니까?<br><br>이름: ";
-		let input = document.createElement("input");
-		input.type = "text";
-		input.autofocus = true;
-		this.ui.appendChild(input);
-		this.ui.innerHTML += "<br><br>";
-		let ybutton = document.createElement("button");
-		ybutton.textContent = "✔";
-		ybutton.onclick = ybutton.ontouchend = function() {
-			let g = guestentry.ui.querySelector("input").value.trim();
-			console.log(g);
-			if (g != "") {
-				window.socket.emit('guestbook', g);
-				window.player.username = g;
-				bedroom.load();
+		let button = document.createElement("button");
+		button.onclick = function() {
+			play("startup");
+			let ui = guestentry.ui;
+			// this.ui.classList.add("selectable");
+			ui.innerHTML = "게스트북에 이름을 적어주시겠습니까?<br><br>이름: ";
+			let input = document.createElement("input");
+			input.type = "text";
+			input.autofocus = true;
+			ui.addEventListener("keydown", function(e) {
+				let k = e.key;
+				play(["type/1", "type/2", "type/3"][Math.random() * 3 | 0]);
+			});
+			ui.appendChild(input);
+			ui.innerHTML += "<br><br>";
+			let ybutton = document.createElement("button");
+			ybutton.textContent = "✓";
+			ybutton.onclick = ybutton.ontouchend = function() {
+				let g = guestentry.ui.querySelector("input").value.trim();
+				console.log(g);
+				if (g != "") {
+					window.socket.emit('guestbook', g);
+					window.player.username = g;
+					bedroom.load();
+					play("click");
+				};
 			};
+			let nbutton = document.createElement("button");
+			nbutton.textContent = "건너뛰기";
+			nbutton.onclick = nbutton.ontouchend = function() { bedroom.load(); play("click"); };
+			ui.appendChild(ybutton);
+			ui.appendChild(nbutton);
 		};
-		let nbutton = document.createElement("button");
-		nbutton.textContent = "건너뛰기";
-		nbutton.onclick = nbutton.ontouchend = function() { bedroom.load(); };
-		this.ui.appendChild(ybutton);
-		this.ui.appendChild(nbutton);
+		button.innerHTML = '<svg fill="var(--light)" width="30" height="30" viewBox="0 0 1000 1000" enable-background="new 0 0 1000 1000" xml:space="preserve"><path d="M673,101.1c-7.2-2.9-14.7-4.4-22.4-4.4c-24.5,0-46.2,14.6-55.4,37.3c-12.4,30.5,2.4,65.5,33,77.8C758,264.4,841.8,388.8,841.8,528.7c0,188.5-153.3,341.8-341.8,341.8c-188.5,0-341.8-153.3-341.8-341.8c0-139.9,83.8-264.2,213.6-316.8c14.8-6,26.4-17.4,32.6-32.1c6.2-14.7,6.4-30.9,0.4-45.7c-9.2-22.7-30.9-37.3-55.4-37.3c-7.7,0-15.2,1.5-22.4,4.4C151.8,172.1,38.7,339.9,38.7,528.7C38.7,783.1,245.6,990,500,990c254.4,0,461.3-206.9,461.3-461.3C961.3,339.8,848.2,172,673,101.1z"/><path d="M500,435.3c27.5,0,49.8-22.3,49.8-49.8V59.8c0-27.5-22.3-49.8-49.8-49.8c-27.5,0-49.8,22.3-49.8,49.8v325.7C450.2,413,472.5,435.3,500,435.3z"/></svg>';
+		this.ui.appendChild(button);
 		GAMEUI.appendChild(this.ui);
 		this.ui.classList.add("hidden");
 	},
@@ -650,6 +680,8 @@ var bedroom = new scene({
 		_renderer.render(_scene, _camera);
 	},
 	withLoad: function() {
+		play("bedroom");
+		
 		_camera.position.set(0, 10, 35);
 		_camera.lookAt(0, 0, 0);
 		_camera.position.y = 15;
@@ -669,6 +701,9 @@ var bedroom = new scene({
 				text: "v"
 			}
 		]);
+	},
+	withUnload: function() {
+		stop("bedroom");
 	},
 	keys: ["phone_case", "phone_screen", "pc", "pc_screen", "guestbook"],
 	key: function(obj) {
@@ -766,10 +801,12 @@ var phone = new scene({
 		let eraser = document.createElement("button");
 		eraser.textContent = "전부 지우기";
 		button.onclick = button.ontouchend = function() {
+			play("click");
 			if (window.player.messages.length == 0) {
 				let button = phone.message_made;
 				button.onclick = button.ontouchend = function() {
 					phone.load();
+					play("click");
 					phone.state = "drawing";
 					phone.drawing_menu.classList.remove("hidden");
 					phone.message.canvas.classList.remove("hidden");
@@ -799,6 +836,7 @@ var phone = new scene({
 		};
 		eraser.onclick = eraser.ontouchend = function() {
 			phone.pulltime = phone.message.canvas.height;
+			play("eraser");
 		};
 		this.ui.appendChild(eraser);
 		this.ui.appendChild(button);
@@ -875,7 +913,7 @@ var phone = new scene({
 		this.loadLabels([
 			{
 				obj: "deer",
-				text: "←"
+				text: PAUSE
 			}
 		]);
 		
@@ -1089,6 +1127,7 @@ var phone = new scene({
 						}
 						pause("phone", this.level);
 						_controls.lockRotation = false;
+						this.level = 0;
 						window.socket.emit('imgrequest');
 					}
 				}
@@ -1124,7 +1163,7 @@ var pc = new scene({
 		this.loadLabels([
 			{
 				obj: "deer",
-				text: "←"
+				text: PAUSE
 			}
 		]);
 		
@@ -1279,7 +1318,7 @@ var pc = new scene({
 		this.loadLabels([
 			{
 				obj: "deer",
-				text: "←"
+				text: PAUSE
 			}
 		]);
 		
