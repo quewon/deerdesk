@@ -280,8 +280,19 @@ _controls.move = function(e) {
 		// _current_scene.group.rotation.x = cap(_current_scene.group.rotation.x, -HALF_PI, HALF_PI);
 	}
 
-	// move action
-
+	// cursor
+	_raycaster.setFromCamera(_controls.pos, _camera);
+	const intersects = _raycaster.intersectObjects(_current_scene.group.children);
+	if (intersects[0]) {
+		let obj = intersects[0].object.name;
+		if (_current_scene.keys.includes(obj)) {
+			document.body.style.cursor = "pointer";
+		} else {
+			document.body.style.cursor = "auto";
+		}
+	} else {
+		document.body.style.cursor = "auto";
+	}
 };
 
 function normalizedMousePosition(x, y) {
@@ -302,6 +313,7 @@ _controls.select = function(e) { // mouseup
 		_current_scene.key(obj);
 	} else {
 		_current_scene.key(null);
+		
 	}
 
 	// reset
@@ -359,6 +371,8 @@ class scene {
 		this.withUnload = p.withUnload || function(){};
 
 		this.css2d = [];
+		
+		this.keys = p.keys || [];
 
 		ref.push(this);
 	}
@@ -554,6 +568,7 @@ var assets = {
 		"bedroom": "models/bedroom.glb",
 		"phone": "models/phone.glb",
 		"pc": "models/pc.glb",
+		"guestbook": "models/guestbook.glb",
 	},
 	images: {
 		"texture": "images/palette.png",
@@ -626,6 +641,40 @@ var guestentry = new scene({
 		this.ui.classList.add("hidden");
 	},
 	key: function() { },
+});
+var guestbook = new scene({
+	init: function(group) {
+		this.loadFromList([
+			"closed_book",
+			"open_book",
+			"guestbook_pencil",
+		]);
+		
+		this.open = group.getObjectByName("open_book");
+		this.closed = group.getObjectByName("closed_book");
+		
+		const toplight = new THREE.SpotLight(0xffe01c, 0.75);
+		toplight.position.set(0, 0, 10);
+		toplight.lookAt(0, 0, 0);
+		toplight.castShadow = true;
+		toplight.shadow.bias = SHADOW_BIAS;
+		group.add(toplight);
+	},
+	withLoad: function() {
+		play("click");
+		_camera.position.set(0, 0, 3);
+		_camera.lookAt(0, 0, 0);
+		_controls.lockRotation = true;
+		
+		this.open.visible = false;
+		this.closed.visible = true;
+		// play("")
+	},
+	withUnload: function() {
+		// stop("")
+	},
+	keys: [],
+	key: function() { }
 });
 var bedroom = new scene({
 	init: function(group) {
@@ -715,6 +764,9 @@ var bedroom = new scene({
 			case "pc":
 			case "pc_screen":
 				game("pc");
+				break;
+			case "guestbook":
+				guestbook.load();
 				break;
 			default:
 				game();
