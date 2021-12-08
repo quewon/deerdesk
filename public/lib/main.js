@@ -10,6 +10,7 @@ var SHADOW_BIAS = -0.0002;
 var GAMEUI = document.getElementById("gameui");
 var GAMEINTRO = document.getElementById("gameintro");
 var PAUSE = "II";
+var DOWNINPUT;
 
 var _width, _height;
 var _renderer, _camera, _raycaster, _composer, _clock;
@@ -183,6 +184,7 @@ function init_3d() {
 	// controls
 
 	var touchDevice = (navigator.maxTouchPoints || 'ontouchstart' in document.documentElement);
+	DOWNINPUT = touchDevice ? "ontouchend" : "onclick";
 
 	if (!touchDevice) {
 		_container.addEventListener("mouseup", function(e) {
@@ -488,12 +490,12 @@ class preview extends scene {
 function pause(name, score) {
 	game("pause", score);
 	const button = document.querySelector("#gameintro button");
-	button.onclick = button.ontouchend = function() {
+	button[DOWNINPUT] = function() {
 		bedroom.load();
 		play("click");
 	};
 	let button2 = GAMEINTRO.querySelector("#return");
-	button2.onclick = button2.ontouchend = function() {
+	button2[DOWNINPUT] = function() {
 		_current_scene.key("unpause");
 		play("click");
 	};
@@ -551,7 +553,7 @@ function game(name, score) {
 			button2.classList.remove("hidden");
 			// levels.classList.add("hidden");
 		} else {
-			button.onclick = button.ontouchend = function() { games[name].load(); play("click"); };
+			button[DOWNINPUT] = function() { games[name].load(); play("click"); };
 			button2.classList.add("hidden");
 		}
 		
@@ -635,7 +637,7 @@ var guestentry = new scene({
 				bedroom.load();
 			};
 		};
-		button.onclick = function() {
+		button[DOWNINPUT] = function() {
 			play("startup");
 			let ui = guestentry.ui;
 			ui.innerHTML = "게스트북에 이름을 적어주시겠습니까?<br><br>이름: ";
@@ -655,10 +657,10 @@ var guestentry = new scene({
 			ui.innerHTML += "<br><br>";
 			let ybutton = document.createElement("button");
 			ybutton.textContent = "✓";
-			ybutton.onclick = ybutton.ontouchend = function() { guestentry.log(); play("click"); };
+			ybutton[DOWNINPUT] = function() { guestentry.log(); play("click"); };
 			let nbutton = document.createElement("button");
 			nbutton.textContent = "건너뛰기";
-			nbutton.onclick = nbutton.ontouchend = function() { bedroom.load(); play("click"); };
+			nbutton[DOWNINPUT] = function() { bedroom.load(); play("click"); };
 			ui.appendChild(ybutton);
 			ui.appendChild(nbutton);
 		};
@@ -811,12 +813,12 @@ var guestbook = new scene({
 			this.currentPage = num;
 			let buttons = this.pagination.querySelectorAll("button");
 			if (num < 1) {
-				buttons[0].onclick = buttons[0].ontouchend = function() {
+				buttons[0][DOWNINPUT] = function() {
 					bedroom.load();
 					play("click");
 				};
 			} else {
-				buttons[0].onclick = buttons[0].ontouchend = function() {
+				buttons[0][DOWNINPUT] = function() {
 					guestbook.page(guestbook.currentPage - 1);
 					play("flip");
 				};
@@ -825,7 +827,7 @@ var guestbook = new scene({
 				buttons[1].classList.add("hidden");
 			} else {
 				buttons[1].classList.remove("hidden");
-				buttons[1].onclick = buttons[1].ontouchend = function() {
+				buttons[1][DOWNINPUT] = function() {
 					guestbook.page(guestbook.currentPage + 1);
 					play("flip");
 				};
@@ -1036,13 +1038,13 @@ var phone = new scene({
 		button.textContent = "완료";
 		let eraser = document.createElement("button");
 		eraser.textContent = "전부 지우기";
-		button.onclick = button.ontouchend = function() {
+		button[DOWNINPUT] = function() {
 			stop("marker");
 			play("click");
 			play("drop");
 			if (window.player.messages.length == 0) {
 				let button = phone.message_made;
-				button.onclick = button.ontouchend = function() {
+				button[DOWNINPUT] = function() {
 					phone.load();
 					assets.sounds.drop.seek(0);
 					phone.state = "drawing";
@@ -1072,7 +1074,7 @@ var phone = new scene({
 			phone.pulltime = phone.wintime;
 			_controls.lockRotation = false;
 		};
-		eraser.onclick = eraser.ontouchend = function() {
+		eraser[DOWNINPUT] = function() {
 			phone.pulltime = phone.message.canvas.height;
 			play("eraser");
 		};
@@ -1473,22 +1475,12 @@ var pc = new scene({
 			position: new CANNON.Vec3(0, platform.position.y, 0),
 		});
 		body.addShape(shape);
-		body.children = [];
+		// body.children = [];
 		body.SIZE = platform.SIZE;
 		body.addEventListener("collide", function(e) {
-			if (e.body.position.y > this.position.y) {
-				// kinda weird but whatever
-				let volume = ((e.contact.getImpactVelocityAlongNormal() - 1) / 29);
-				assets.sounds.collision.seek(0);
-				play("collision", volume);
-				for (let child of this.children) {
-					if (child.id == e.body.id) {
-						return;
-					}
-				}
-				
-				this.children.push(e.body);
-			}
+			let volume = ((e.contact.getImpactVelocityAlongNormal() - 1) / 29);
+			assets.sounds.collision.seek(0);
+			play("collision", volume);
 		});
 		platform.CANNON = body;
 		
@@ -1539,15 +1531,18 @@ var pc = new scene({
 				position: new CANNON.Vec3(x, this.dropHeight, 0),
 			});
 			mesh.position.copy(body.position);
-			body.children = [];
+			body.parents = [];
 			body.addEventListener("collide", function(e) {
-				if (e.body.position.y > this.position.y) {
-					for (let child of this.children) {
-						if (child.id == e.body.id) {
+				let volume = ((e.contact.getImpactVelocityAlongNormal() - 1) / 29);
+				assets.sounds.collision.seek(0);
+				play("collision", volume);
+				if (e.body.position.y < this.position.y) {
+					for (let parent of this.parents) {
+						if (parent.id == e.body.id) {
 							return;
 						}
 					}
-					this.children.push(e.body);
+					this.parents.push(e.body);
 				}
 			});
 			body.addShape(shape);
@@ -1614,6 +1609,13 @@ var pc = new scene({
 		};
 		this.reload();
 	},
+	withUnload: function() {
+		stop("snake");
+		stop("frog");
+		stop("monkey");
+		stop("bear");
+		stop("cat");
+	},
 	keys: ["deer"],
 	key: function(obj) {
 		switch (obj) {
@@ -1644,14 +1646,16 @@ var pc = new scene({
 				// this.world.step(0.035);
 				this.world.step(1/60, dt*2, 5);
 				
-				// blocks
-				
-				for (let block of this.active) {
-					block.CANNON.CHANGE = block.CANNON.position.x - block.position.x;
+				var platform = this.platform.CANNON;
+				const input = _controls.offset.x * this.platformSpeed;
+				// move the platform
+				if (_controls.offset) {
+					platform.position.x -= input;
+					platform.CHANGE = platform.position.x - this.platform.position.x;
+					this.platform.position.copy(platform.position);
 				}
 				
-				for (let i=this.active.length-1; i>=0; i--) {
-					let block = this.active[i];
+				for (let block of this.active) {
 					if (block.TIME > -1) {
 						block.TIME++;
 						if (block.TIME > this.threshold) {
@@ -1670,37 +1674,24 @@ var pc = new scene({
 						_controls.lockRotation = false;
 					}
 					
-					for (let child of block.CANNON.children) {
-						if (!pc.checkContact(block.CANNON, child)) {
-							block.CANNON.children.splice(block.CANNON.children.indexOf(child), 1);
+					block.CANNON.CHANGE = block.CANNON.position.x - block.position.x;
+					
+					// handle parents & offset movement by parents movement
+					for (let parent of block.CANNON.parents) {
+						if (!pc.checkContact(block.CANNON, parent)) {
+							block.CANNON.parents.splice(block.CANNON.parents.indexOf(parent), 1);
 						} else {
-							let offset = child.position.x - block.position.x;
-							// child.position.x = block.CANNON.position.x + offset;
-							child.position.x += block.CANNON.CHANGE;
+							block.CANNON.CHANGE += parent.CHANGE;
 						}
 					}
 					
+					block.CANNON.position.x = block.position.x + block.CANNON.CHANGE;
+					
+					// update block mesh position to block's cannon body
 					const q = block.CANNON.quaternion;
 					block.rotation.set(q.x, q.y, q.z);
 					block.position.copy(block.CANNON.position);
 				}
-				
-				// platform
-				
-				var platform = this.platform.CANNON;
-				const input = _controls.offset.x * this.platformSpeed;
-				if (_controls.offset) {
-					platform.position.x -= input;
-					for (let child of platform.children) {
-						if (!pc.checkContact(platform, child)) {
-							platform.children.splice(platform.children.indexOf(child), 1);
-						} else {
-							let offset = child.position.x - this.platform.position.x;
-							child.position.x = platform.position.x + offset;
-						}
-					}
-				}
-				this.platform.position.copy(platform.position);
 				break;
 			case "pause":
 				break;
