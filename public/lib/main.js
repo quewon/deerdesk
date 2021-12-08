@@ -182,31 +182,38 @@ function init_3d() {
 
 	// controls
 
-	_container.addEventListener("mousedown", function() {
-		_controls.touch = true;
-	});
-	_container.addEventListener("mousemove", function(e) {
-		_controls.move(e);
-	});
-	_container.addEventListener("touchstart", function(e) {
-		// this prevents user from touching buttons
-		// e.preventDefault();
-		_controls.touch = true;
-		_controls.move(e);
-	});
-	_container.addEventListener("touchmove", function(e) {
-		e.preventDefault();
-		_controls.move(e);
-	});
-	_container.addEventListener("mouseup", function(e) {
-		_controls.select(e);
-	});
-	_container.addEventListener("touchend", function(e) {
-		_controls.select(e);
-	});
-	_container.addEventListener("touchcancel", function(e) {
-		_controls.select(e);
-	});
+	var touchDevice = (navigator.maxTouchPoints || 'ontouchstart' in document.documentElement);
+
+	if (!touchDevice) {
+		_container.addEventListener("mouseup", function(e) {
+			_controls.select(e);
+		});
+		_container.addEventListener("mousedown", function() {
+			_controls.touch = true;
+		});
+		_container.addEventListener("mousemove", function(e) {
+			_controls.move(e);
+		});
+	} else {
+		_container.addEventListener("touchstart", function(e) {
+			// this prevents user from touching buttons
+			// e.preventDefault();
+			_controls.touch = true;
+			_controls.move(e);
+		});
+		_container.addEventListener("touchmove", function(e) {
+			e.preventDefault();
+			_controls.move(e);
+		});
+		_container.addEventListener("touchend", function(e) {
+			if (e.target.tagName == "button") e.preventDefault();
+			if (e.target.parentNode) {
+				if (e.target.parentNode.tagName == "button") e.preventDefault();
+			}
+			_controls.select(e);
+			// double tap happens because mouseup and touchend both work
+		});
+	}
 	_container.addEventListener("blur", function(e) {
 		_controls.select(e);
 	});
@@ -314,7 +321,6 @@ _controls.select = function(e) { // mouseup
 		_current_scene.key(obj);
 	} else {
 		_current_scene.key(null);
-		
 	}
 
 	// reset
@@ -589,9 +595,21 @@ var assets = {
 		"click": { src: "sounds/click.wav", loop: false },
 		"eraser": { src: "sounds/wiper.wav", loop: false },
 		"bedroom": { src: "sounds/midnight.wav", loop: true },
-		
+		"phone": { src: "sounds/link.wav", loop: true },
+		"frequency": { src: "sounds/frequency.wav", loop: true },
+		"drop": { src: "sounds/drop.wav", loop: false },
+		"bite": { src: "sounds/bite.wav", loop: false },
+		"marker": { src: "sounds/marker.wav", loop: true },
+		"win": { src: "sounds/win.wav", loop: false },
+		"lose": { src: "sounds/lose.wav", loop: false },
 		"flip": { src: "sounds/click.wav", loop: false },
 		"collision": { src: "sounds/collision.wav", loop: false },
+		
+		"snake": { src: "sounds/snake.wav", loop: true },
+		"frog": { src: "sounds/frog.wav", loop: true },
+		"bear": { src: "sounds/bear.wav", loop: true },
+		"cat": { src: "sounds/cat.wav", loop: true },
+		"monkey": { src: "sounds/monkey.wav", loop: true },
 	},
 };
 
@@ -683,6 +701,7 @@ var guestbook = new scene({
 			let scale = _height / 250;
 			this.ui.style.width = 80*scale+"px";
 			this.body.style.height = 100*scale+"px";
+			this.ui.style.fontSize = 6*scale+"px";
 		};
 		this.getSize();
 		
@@ -817,6 +836,7 @@ var guestbook = new scene({
 	},
 	withLoad: function() {
 		play("click");
+		play("bedroom");
 		_camera.position.set(0, 0, 3);
 		_camera.lookAt(0, 0, 0);
 		_controls.lockRotation = true;
@@ -825,12 +845,11 @@ var guestbook = new scene({
 		this.open.visible = false;
 		this.closed.visible = true;
 		this.updateBook();
-		// play("")
 		
 		this.page(0);
 	},
 	withUnload: function() {
-		// stop("")
+		stop("bedroom")
 		this.ui.classList.add("hidden");
 	},
 	keys: [],
@@ -1018,12 +1037,14 @@ var phone = new scene({
 		let eraser = document.createElement("button");
 		eraser.textContent = "전부 지우기";
 		button.onclick = button.ontouchend = function() {
+			stop("marker");
 			play("click");
+			play("drop");
 			if (window.player.messages.length == 0) {
 				let button = phone.message_made;
 				button.onclick = button.ontouchend = function() {
 					phone.load();
-					play("click");
+					assets.sounds.drop.seek(0);
 					phone.state = "drawing";
 					phone.drawing_menu.classList.remove("hidden");
 					phone.message.canvas.classList.remove("hidden");
@@ -1127,6 +1148,9 @@ var phone = new scene({
 		}
 	},
 	withLoad: function() {
+		assets.sounds.phone.seek(0);
+		play("phone");
+		
 		this.loadLabels([
 			{
 				obj: "deer",
@@ -1158,6 +1182,9 @@ var phone = new scene({
 		this.eraseSpeed = 3;
 	},
 	withUnload: function() {
+		stop("phone");
+		stop("frequency");
+		
 		this.drawing_menu.classList.add("hidden");
 		this.ui.classList.add("hidden");
 		this.message.canvas.classList.add("hidden");
@@ -1166,7 +1193,7 @@ var phone = new scene({
 	key: function(obj) {
 		switch (obj) {
 			case "deer":
-				if (this.state != "pull" && this.state != "wait") {
+				if (this.state != "pull") {
 					if (this.level > window.player.wins.phone) {
 						setScore("phone", this.level);
 					}
@@ -1229,8 +1256,9 @@ var phone = new scene({
 		        m.lineTo(mouse.x, mouse.y);
 		        m.stroke();
 		        m.closePath();
-						
 						this.ui.classList.remove("hidden");
+					} else {
+						play("marker");
 					}
 					
 					this.prevmouse = {
@@ -1239,6 +1267,7 @@ var phone = new scene({
 					};
 				} else {
 					this.prevmouse = null;
+					stop("marker");
 				}
 				
 				break;
@@ -1267,6 +1296,10 @@ var phone = new scene({
 					this.pulltime = this.wintime * lvl/2;
 					this.state = "pull";
 					this.indicator.visible = true;
+					assets.sounds.frequency.seek(0);
+					play("frequency");
+					assets.sounds.bite.seek(0);
+					play("bite");
 				}
 				this.pulltime--;
 				break;
@@ -1292,6 +1325,7 @@ var phone = new scene({
 					if (this.pulltime < 0) {
 						// win
 						this.level++;
+						stop("frequency");
 				
 						this.state = "idle";
 						_camera.position.set(0, 5, 35);
@@ -1335,7 +1369,10 @@ var phone = new scene({
 					this.pulltime = this.wintime * lvl/2;
 					
 					if (this.bobber.position.y <= -10 || this.bobber.position.y > 9.44335) {
+						assets.sounds.lose.seek(0);
+						play("lose");
 						this.state = "lose";
+						stop("frequency");
 						this.velocity = 0;
 						this.indicator.visible = false;
 						this.bobber.material.emissive = {r:0, g:1, b:1, isColor: true};
@@ -1350,6 +1387,8 @@ var phone = new scene({
 				}
 				break;
 			case "win":
+				assets.sounds.win.seek(0);
+				play("win");
 				this.velocity = 0;
 				this.state = "idle";
 				break;
@@ -1437,8 +1476,11 @@ var pc = new scene({
 		body.children = [];
 		body.SIZE = platform.SIZE;
 		body.addEventListener("collide", function(e) {
-			play("collision", e.contact.getImpactVelocityAlongNormal() / 2);
 			if (e.body.position.y > this.position.y) {
+				// kinda weird but whatever
+				let volume = ((e.contact.getImpactVelocityAlongNormal() - 1) / 29);
+				assets.sounds.collision.seek(0);
+				play("collision", volume);
 				for (let child of this.children) {
 					if (child.id == e.body.id) {
 						return;
@@ -1475,7 +1517,11 @@ var pc = new scene({
 				x = Math.ceil(Math.random() * this.dropWidth) * (Math.round(Math.random()) ? 1 : -1);
 			}
 			
-			var obj = assets.models[this.randomBlocks[this.randomBlocks.length * Math.random() | 0]];
+			let name = this.randomBlocks[this.randomBlocks.length * Math.random() | 0];
+			stop(name);
+			play(name);
+			
+			var obj = assets.models[name];
 			
 			var mesh = new THREE.Mesh(obj.geometry.clone(), obj.material.clone());
 			mesh.name = name;
@@ -1557,6 +1603,12 @@ var pc = new scene({
 			this.group.add(this.gamegroup);
 			this.world.bodies = [this.platform.CANNON];
 			
+			stop("snake");
+			stop("frog");
+			stop("monkey");
+			stop("bear");
+			stop("cat");
+			
 			this.createBlock(0);
 			this.dropBlock();
 		};
@@ -1609,6 +1661,8 @@ var pc = new scene({
 					}
 					if (block.CANNON.position.y < this.ground) {
 						this.state = "lose";
+						assets.sounds.lose.seek(0);
+						play("lose");
 						if (window.player.wins.pc < this.active.length-1) {
 							setScore("pc", this.active.length-1);	
 						}
