@@ -189,7 +189,8 @@ function init_3d() {
 		_controls.move(e);
 	});
 	_container.addEventListener("touchstart", function(e) {
-		e.preventDefault();
+		// this prevents user from touching buttons
+		// e.preventDefault();
 		_controls.touch = true;
 		_controls.move(e);
 	});
@@ -336,6 +337,13 @@ function getSize() {
 	}
 	
 	let prevsize = _height/3;
+	
+	if ('getSize' in phone) {
+		phone.getSize();
+	}
+	if ('getSize' in guestbook) {
+		guestbook.getSize();
+	}
 	
 	_camera.aspect = 1;
   _camera.updateProjectionMatrix();
@@ -492,7 +500,6 @@ function unpause() {
 
 function setScore(name, score) {
 	window.player.wins[name] = score;
-	console.log({ game: name, username: window.player.username, score: score });
 	window.socket.emit('setscore', { game: name, username: window.player.username, score: score });
 }
 
@@ -582,10 +589,14 @@ var assets = {
 		"click": { src: "sounds/click.wav", loop: false },
 		"eraser": { src: "sounds/wiper.wav", loop: false },
 		"bedroom": { src: "sounds/midnight.wav", loop: true },
+		
+		"flip": { src: "sounds/click.wav", loop: false },
+		"collision": { src: "sounds/collision.wav", loop: false },
 	},
 };
 
-function play(sound) {
+function play(sound, volume) {
+	if (volume) assets.sounds[sound].volume(volume);
 	assets.sounds[sound].play();
 }
 function stop(sound) {
@@ -597,10 +608,18 @@ var guestentry = new scene({
 		this.ui = document.createElement("div");
 		this.ui.id = "guestentry";
 		let button = document.createElement("button");
+		this.log = function() {
+			let g = this.ui.querySelector("input").value.trim();
+			console.log(g);
+			if (g != "") {
+				window.socket.emit('guestbook', g);
+				window.player.username = g;
+				bedroom.load();
+			};
+		};
 		button.onclick = function() {
 			play("startup");
 			let ui = guestentry.ui;
-			// this.ui.classList.add("selectable");
 			ui.innerHTML = "게스트북에 이름을 적어주시겠습니까?<br><br>이름: ";
 			let input = document.createElement("input");
 			input.type = "text";
@@ -608,21 +627,17 @@ var guestentry = new scene({
 			ui.addEventListener("keydown", function(e) {
 				let k = e.key;
 				play(["type/1", "type/2", "type/3"][Math.random() * 3 | 0]);
+				
+				if (k == "Enter") {
+					console.log(guestentry);
+					guestentry.log();
+				}
 			});
 			ui.appendChild(input);
 			ui.innerHTML += "<br><br>";
 			let ybutton = document.createElement("button");
 			ybutton.textContent = "✓";
-			ybutton.onclick = ybutton.ontouchend = function() {
-				let g = guestentry.ui.querySelector("input").value.trim();
-				console.log(g);
-				if (g != "") {
-					window.socket.emit('guestbook', g);
-					window.player.username = g;
-					bedroom.load();
-					play("click");
-				};
-			};
+			ybutton.onclick = ybutton.ontouchend = function() { guestentry.log(); play("click"); };
 			let nbutton = document.createElement("button");
 			nbutton.textContent = "건너뛰기";
 			nbutton.onclick = nbutton.ontouchend = function() { bedroom.load(); play("click"); };
@@ -659,19 +674,164 @@ var guestbook = new scene({
 		toplight.castShadow = true;
 		toplight.shadow.bias = SHADOW_BIAS;
 		group.add(toplight);
+		
+		this.ui = document.getElementById("guestbook");
+		this.body = this.ui.querySelector("span");
+		this.pagination = this.ui.querySelector("#pagination");
+		
+		this.getSize = function() {
+			let scale = _height / 250;
+			this.ui.style.width = 80*scale+"px";
+			this.body.style.height = 100*scale+"px";
+		};
+		this.getSize();
+		
+		this.currentPage = 0;
+		this.startingPages = [
+			{
+				content: "<h1>guestbook</h1><br>2021 dima 뉴미디어 페스티벌",
+				book: "closed",
+			},
+			{
+				content: `
+				<h1>오늘의 일기</h1>
+				목차:
+				<ol>
+					<li>리더보드 - 1</li>
+					<li>리더보드 - 2</li>
+					<li>게스트북</li>
+				</ol>
+				<hr>
+				<span style='font-size:0.75em'>
+				안녕하세요!<br>
+				여기까지 찾아와주셔서 감사합니다.<br>
+				모든 게임은 '터치' 액션으로만 이루어져 있습니다.<br>
+				- 규원
+				</span>`,
+				book: "open",
+			},
+		];
+		this.updateBook = function() {
+			this.pages = [];
+			this.pages[0] = this.startingPages[0];
+			this.pages[1] = this.startingPages[1];
+			
+			// leaderboards
+			var pc = "";
+			var phone = "";
+			
+			const scores = window.scores;
+			scores.pc.sort((a, b) => (a.score < b.score) ? 1 : -1);
+			scores.phone.sort((a, b) => (a.score < b.score) ? 1 : -1);
+			
+			var max = 6;
+			for (let i=0; i<max; i++) {
+				let data = scores.pc[i];
+				if (!data) break;
+				pc += "<li>"+data.username+" - "+data.score+"점</li>"
+			}
+			if (pc == "") { pc = "음... 아무도 없네!?" }
+			
+			for (let i=0; i<max; i++) {
+				let data = scores.phone[i];
+				if (!data) break;
+				phone += "<li>"+data.username+" - "+data.score+"점</li>"
+			}
+			if (phone == "") { phone = "음... 아무도 없네!?" }
+			
+			pc = "<h1>컴퓨터 게임 리더보드</h1><hr><ol>"+pc+"</ol>";
+			phone = "<h1>핸드폰 게임 리더보드</h1><hr><ol>"+phone+"</ol>";
+			
+			this.pages.push({
+				content: pc,
+				book: "open",
+			});
+			this.pages.push({
+				content: phone,
+				book: "open",
+			});
+			
+			// guestbook
+			const guests = window.guestbook;
+			var content = [];
+			var y = 0;
+			var x = 0;
+			max = 8;
+			content[x] = "";
+			for (let name of guests) {
+				content[x] += name+"<br>";
+				y++;
+				if (y >= max) {
+					y = 0;
+					x++;
+					content[x] = "";
+				}
+			}
+			
+			for (let page of content) {
+				this.pages.push({
+					content: "<h1>guestbook</h1><hr>"+page,
+					book: "open"
+				})
+			}
+		};
+		
+		this.page = function(num) {
+			var p = this.pages[num];
+			this.body.innerHTML = p.content;
+			this.open.visible = false;
+			this.closed.visible = false;
+			this[p.book].visible = true;
+			
+			if (p.book == "closed") {
+				this.ui.classList.remove("dark");
+			} else {
+				this.ui.classList.add("dark");
+			}
+			
+			this.currentPage = num;
+			let buttons = this.pagination.querySelectorAll("button");
+			if (num < 1) {
+				buttons[0].onclick = buttons[0].ontouchend = function() {
+					bedroom.load();
+					play("click");
+				};
+			} else {
+				buttons[0].onclick = buttons[0].ontouchend = function() {
+					guestbook.page(guestbook.currentPage - 1);
+					play("flip");
+				};
+			}
+			if (num >= this.pages.length-1) {
+				buttons[1].classList.add("hidden");
+			} else {
+				buttons[1].classList.remove("hidden");
+				buttons[1].onclick = buttons[1].ontouchend = function() {
+					guestbook.page(guestbook.currentPage + 1);
+					play("flip");
+				};
+			}
+		};
+		
+		this.ui.classList.add("hidden");
 	},
 	withLoad: function() {
 		play("click");
 		_camera.position.set(0, 0, 3);
 		_camera.lookAt(0, 0, 0);
 		_controls.lockRotation = true;
+		this.ui.classList.remove("hidden");
 		
 		this.open.visible = false;
 		this.closed.visible = true;
+		this.updateBook();
 		// play("")
+		
+		this.page(0);
 	},
 	withUnload: function() {
 		// stop("")
+		this.ui.classList.add("hidden");
 	},
 	keys: [],
 	key: function() { }
@@ -816,11 +976,16 @@ var phone = new scene({
 		this.message = document.createElement("canvas").getContext("2d");
 		this.message.canvas.width = this.context.canvas.width-20;
 		this.message.canvas.height = this.context.canvas.height/2-60;
-		let scale = _height/600;
-		this.message.canvas.style.width = this.message.canvas.width*scale+"px";
-		this.message.canvas.style.height = this.message.canvas.height*scale+"px";
+		
+		this.getSize = function() {
+			let scale = _height/600;
+			this.message.canvas.style.width = this.message.canvas.width*scale+"px";
+			this.message.canvas.style.height = this.message.canvas.height*scale+"px";
+			this.message.canvas.style.marginLeft = 11*scale+"px";
+		};
+		this.getSize();
+		
 		this.message.canvas.style.zIndex = 10;
-		this.message.canvas.style.marginLeft = 11*scale+"px";
 		this.message.canvas.style.borderRadius = "2em";
 		this.message.canvas.classList.add("centered");
 		_container.appendChild(this.message.canvas);
@@ -1248,7 +1413,7 @@ var pc = new scene({
 		var world = new CANNON.World();
 		world.broadphase = new CANNON.NaiveBroadphase();
 		world.gravity.set(0, -9.8, 0);
-		this.density = 1000;
+		this.density = 500;
 		
 		this.world = world;
 		
@@ -1272,6 +1437,7 @@ var pc = new scene({
 		body.children = [];
 		body.SIZE = platform.SIZE;
 		body.addEventListener("collide", function(e) {
+			play("collision", e.contact.getImpactVelocityAlongNormal() / 2);
 			if (e.body.position.y > this.position.y) {
 				for (let child of this.children) {
 					if (child.id == e.body.id) {
@@ -1363,7 +1529,7 @@ var pc = new scene({
 		this.dropHeight = 50;
 		this.dropWidth = 10;
 		this.threshold = 150;
-		this.platformSpeed = 15;
+		this.platformSpeed = 30;
 		this.ground = 0;
 	},
 	withLoad: function() {
@@ -1423,7 +1589,8 @@ var pc = new scene({
 	update: function(dt) {
 		switch (this.state) {
 			case "dropping":
-				this.world.step(dt*2);
+				// this.world.step(0.035);
+				this.world.step(1/60, dt*2, 5);
 				
 				// blocks
 				
@@ -1438,15 +1605,13 @@ var pc = new scene({
 						if (block.TIME > this.threshold) {
 							block.TIME = -1;
 							this.dropBlock();
-							
-							var points = this.active.length-1;
-							if (window.player.wins.pc < points) {
-								setScore("pc", points);
-							}
 						}
 					}
 					if (block.CANNON.position.y < this.ground) {
 						this.state = "lose";
+						if (window.player.wins.pc < this.active.length-1) {
+							setScore("pc", this.active.length-1);	
+						}
 						pause("pc", this.active.length-1);
 						_controls.lockRotation = false;
 					}
@@ -1469,7 +1634,7 @@ var pc = new scene({
 				// platform
 				
 				var platform = this.platform.CANNON;
-				const input = _controls.offset.x * _controls.speed * this.platformSpeed;
+				const input = _controls.offset.x * this.platformSpeed;
 				if (_controls.offset) {
 					platform.position.x -= input;
 					for (let child of platform.children) {

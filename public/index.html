@@ -20,6 +20,7 @@
 		
 		* {
 			-webkit-touch-callout: none; /* iOS Safari */
+			-webkit-text-size-adjust: none;             /* prevent webkit from resizing text to fit */
 	    -webkit-user-select: none; /* Safari */
 	     -khtml-user-select: none; /* Konqueror HTML */
 	       -moz-user-select: none; /* Old versions of Firefox */
@@ -211,13 +212,13 @@
 			z-index: 10;
 		}
 		
-		#guestentry button {
+		#guestentry button, #pagination button {
 			background: transparent;
 			border: 1px solid var(--light);
 			width: fit-content;
 			min-width: 2.5em;
 		}
-		#guestentry button:active {
+		#guestentry button:active, #pagination button:active {
 			border-color: var(--light-bg);
 		}
 		
@@ -233,6 +234,49 @@
 		  50% {
 				padding-top: 10px;
 		  }
+		}
+		
+		#guestbook span {
+			display: block;
+			line-height: 1.5em;
+		}
+		#guestbook {
+			min-width: 0px !important;
+			word-break: keep-all;
+		}
+		#guestbook.dark {
+			color: var(--bg);
+			padding-left: 2em;
+		}
+		#guestbook.dark button {
+			border-color: var(--bg);
+			color: var(--bg);
+		}
+		#guestbook.dark button:active {
+			opacity: 0.25;
+		}
+		#guestbook.dark hr {
+			border-color: var(--bg);
+			opacity: 0.25;
+			width: 75%;
+			margin: 1em;
+		}
+		#guestbook.dark span {
+			text-align: left;
+		}
+		
+		ol {
+			margin: 0;
+			text-align: left;
+		}
+		
+		h1 {
+			margin: 0;
+			line-height: normal !important;
+		}
+		
+		#pagination {
+			transform: translateY(1em)
 		}
 	</style>
 </head>
@@ -251,6 +295,13 @@
 		<div id="drawing_menu" class="hidden" style="pointer-events: none;">
 			남들을 위한 쪽지를 그려<br>
 			그걸 미끼로 삼았다
+		</div>
+		
+		<div id="guestbook" class="centered hidden">
+			<span>text here</span>
+			<div id="pagination">
+				<button type="button" style="float:left"><</button><button type="button" style="float:right">></button>
+			</div>
 		</div>
 	</div>
 		
@@ -286,7 +337,7 @@
 	
 	var imgs = [];
 	var guestbook = [];
-	var scores = {};
+	var scores = { pc: [], phone: [] };
 	
 	// https://stackoverflow.com/questions/19426882/node-js-socket-io-socket-io-js-not-found/22218615
 	
@@ -301,8 +352,13 @@
 	function sendData() {
 		socket.emit('datarequest');
 	}
+	socket.emit('datarequest');
 	socket.on('datasend', function(data) {
 		console.log(data);
+		imgs = data.imgs;
+		guestbook = data.guestbook;
+		scores.pc = data.scores.pc;
+		scores.phone = data.scores.phone;
 	});
 	socket.on('getscore', (data) => {
 		scores.pc = data.pc;
